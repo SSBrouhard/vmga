@@ -1,0 +1,75 @@
+# VMGA Profile C: Scoped Execution
+# Reference policy. Review and adapt before production use.
+
+vmga_version: "0.2.0"
+profile: scoped_execution
+description: |
+  Agent can perform narrowly bounded mailbox modifications. Sending remains
+  approval-gated and should not be enabled without deployment bypass closure.
+
+allowed_actions:
+  - read
+  - summarize
+  - classify
+  - extract_entities
+  - recommend_draft
+  - create_draft
+  - archive
+  - apply_label
+
+denied_actions:
+  - forward
+  - delete
+  - download_attachment
+
+kinetic_requires_approval: true
+
+approval_required:
+  create_draft: true
+  archive: true
+  apply_label: true
+  send: true
+  forward: true
+  delete: true
+
+label_allowlist:
+  - Priority
+  - Handled
+  - Waiting
+
+draft_policy:
+  max_length: 5000
+  require_justification: true
+  allow_external_recipients: false
+
+content_analysis:
+  enabled: true
+  enforce_risk_threshold: true
+  max_risk_score_auto_allow: 0
+
+high_risk_indicators:
+  - payment_mention
+  - urgency_language
+  - credential_request
+  - external_recipient
+  - secrecy_instructions
+  - legal_threat
+
+domain_policy:
+  internal_domains:
+    - example.com
+  external_domain_deny: true
+  log_external_senders: true
+
+approval_workflow:
+  expiration: 3600
+
+lockdown_threshold: 5
+ledger_required_for_kinetic: true
+proposal_ttl_seconds: 3600
+
+baseline_denies:
+  financial_instructions: true
+  credential_transmission: true
+  mfa_recovery_handling: true
+  bulk_forwarding: true

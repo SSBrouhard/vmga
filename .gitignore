@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+.DS_Store
+
+# Secrets and local runtime state
+.env
+.env.*
+*.pem
+*.key
+*client_secret*
+google_token.json
+google_client_secret.json
+.vmga_state/
+vmga_state/

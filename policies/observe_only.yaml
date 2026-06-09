@@ -1,0 +1,46 @@
+# VMGA Profile A: Observe Only
+# Non-production reference policy (TRL 4-5)
+# Classification: UNCLASSIFIED // TLP:WHITE
+
+vmga_version: "0.2.0"
+profile: observe_only
+description: |
+  Read-only Gmail access for inbox triage, classification, and summarization.
+  No mailbox-modifying actions permitted.
+
+# Action classification (deny-by-default if not in allowed_actions)
+allowed_actions:
+  - read
+  - summarize
+  - classify
+  - extract_entities
+  - recommend_draft  # Returns text only, does not create draft
+
+denied_actions:
+  - send
+  - forward
+  - delete
+  - download_attachment
+
+# Kinetic action settings
+kinetic_requires_approval: false  # Non-kinetic only in this profile
+
+# Content analysis settings
+content_analysis:
+  enabled: true
+  enforce_risk_threshold: false
+  max_risk_score_auto_allow: 10
+
+# Baseline deny categories (always denied regardless of profile)
+baseline_denies:
+  financial_instructions: true
+  credential_transmission: true
+  mfa_recovery_handling: true
+  bulk_forwarding: true
+
+# Domain restrictions
+domain_policy:
+  internal_domains:
+    - example.com
+  external_domain_deny: true
+  log_external_senders: true

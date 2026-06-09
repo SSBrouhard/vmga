@@ -1,0 +1,65 @@
+# VMGA Profile B: Draft Assist
+# Non-production reference policy (TRL 4-5)
+# Classification: UNCLASSIFIED // TLP:WHITE
+
+vmga_version: "0.2.0"
+profile: draft_assist
+description: |
+  Agent can read, analyze, and propose draft replies.
+  Draft creation requires human approval.
+  Sending is denied by default.
+
+# Action classification (deny-by-default if not in allowlist)
+allowed_actions:
+  - read
+  - summarize
+  - classify
+  - extract_entities
+  - recommend_draft
+  - create_draft
+
+denied_actions:
+  - send
+  - forward
+  - delete
+  - download_attachment
+
+# Kinetic action settings
+kinetic_requires_approval: true
+
+# Content risk rules
+content_analysis:
+  enabled: true
+  enforce_risk_threshold: true
+  max_risk_score_auto_allow: 0  # Any risk flag requires review
+
+# Risk flags that trigger mandatory review
+high_risk_indicators:
+  - payment_mention
+  - urgency_language
+  - credential_request
+  - external_recipient
+  - secrecy_instructions
+
+# Domain restrictions
+domain_policy:
+  internal_domains:
+    - example.com
+  external_domain_deny: true
+  log_external_senders: true
+
+# Approval workflow
+approval_workflow:
+  expiration: 3600  # 1 hour in seconds
+  # channel: webhook  # Integration-specific
+  # one_time: true    # Enforced by adapter
+
+# Lockdown settings
+lockdown_threshold: 5  # Denials before lockdown
+
+# Baseline deny categories
+baseline_denies:
+  financial_instructions: true
+  credential_transmission: true
+  mfa_recovery_handling: true
+  bulk_forwarding: true

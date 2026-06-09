@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vmga"
+version = "0.2.0"
+description = "Vesta Mail Governance Adapter for agentic Gmail access"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "LicenseRef-Pending" }
+authors = [
+  { name = "Sovereign Safety Labs" }
+]
+dependencies = [
+  "PyYAML>=6.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+filterwarnings = [
+  "ignore::DeprecationWarning"
+]
