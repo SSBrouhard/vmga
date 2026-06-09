@@ -13,6 +13,25 @@ described as a hard Gmail governance boundary.
 5. Kinetic actions fail closed when policy, state, approval, or evidence writes
    are unavailable.
 
+## OpenClaw Deployments
+
+For OpenClaw, VMGA assumes one trusted operator boundary per gateway. Use
+separate gateways, OS users, hosts, VMs, or containers for materially different
+trust boundaries. Shared routing labels and `sessionKey` values are context
+selectors, not VMGA authorization boundaries.
+
+Before exposing an OpenClaw-backed VMGA deployment, run:
+
+```bash
+openclaw doctor
+openclaw security audit --deep
+openclaw health
+```
+
+Record the audit output, accepted residual warnings, gateway config hash, VMGA
+policy hash, plugin manifest hash, and proof that non-VMGA Gmail write paths are
+denied. See `docs/openclaw_integration.md` for the detailed OpenClaw checklist.
+
 ## Advisory Mode
 
 If VMGA runs in the same authority context as the agent, or if the agent can read

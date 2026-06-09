@@ -56,6 +56,8 @@ pytest -q
   borrows that ergonomics direction, not hardmail's self-gated approval model.
 - OWASP DSOVS, as a release-readiness and evidence self-assessment lens. This
   does not imply OWASP certification or endorsement.
+- OpenClaw's public gateway security, exposure, formal-model, and MITRE ATLAS
+  threat-model docs, as deployment-boundary references for OpenClaw integrations.
 
 ## Non-Goals
 
