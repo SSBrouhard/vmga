@@ -67,6 +67,11 @@ pytest -q
 - OpenClaw sandboxing, OpenShell, tool policy/elevated, operator-scope, and
   secure-file-operation docs, as isolation and file-safety references. These are
   deployment controls, not proof that VMGA is enforced by themselves.
+- Hermes security, Docker, Tool Gateway, credential-pool, gateway-internals,
+  session-storage, CLI-extension, and tools-runtime docs, as Hermes deployment
+  boundary references.
+- Hermes plugin-build docs, as the reference shape for VMGA's future Hermes
+  plugin package and tool handler contract.
 
 ## Non-Goals
 

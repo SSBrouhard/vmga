@@ -31,6 +31,19 @@ Before making VMGA public:
 - If trusted-proxy auth is documented or enabled, verify the proxy authenticates
   users, is the only gateway path, strips or overwrites identity headers, and
   has an explicit `allowUsers` operator list for shared audiences.
+- For Hermes examples, verify `--yolo`, `/yolo`, `HERMES_YOLO_MODE=1`, and
+  `approvals.mode: off` are not part of mailbox-capable deployments.
+- Verify Hermes gateway allowlists or DM pairing restrict who can trigger VMGA
+  mail tools.
+- Verify Hermes env passthrough, Docker forwarded env vars, credential-file
+  mounts, MCP env config, hooks, plugins, cron jobs, and native
+  Google Workspace tools do not expose Gmail writes outside VMGA.
+- Verify Hermes plugin examples use the standard plugin layout, declare only
+  VMGA tools in `provides_tools`, return JSON strings from handlers, and avoid
+  slash-command/hook dispatch to non-VMGA Gmail or terminal tools.
+- Verify Hermes `~/.hermes/state.db`, gateway logs, credential files, browser
+  profiles, VMGA state, and VMGA evidence are treated as sensitive deployment
+  artifacts.
 - Verify example policies use placeholder domains and strict defaults.
 - Verify `SECURITY.md` has a monitored reporting path.
 - Record DSOVS self-assessment evidence in `docs/dsovs_readiness.md`.

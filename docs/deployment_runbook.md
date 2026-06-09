@@ -70,6 +70,35 @@ handling untrusted paths; they are not a sandbox. VMGA state, evidence, Gmail
 credentials, browser profiles, Docker sockets, and OpenClaw config/auth material
 must stay outside any agent-readable or sandbox-mounted path.
 
+## Hermes Deployments
+
+For Hermes, VMGA hard enforcement requires a shell-free VMGA mail tool surface
+and credential isolation from the Hermes agent process. Hermes dangerous-command
+approval, YOLO state, Docker isolation, MCP environment filtering, Tool Gateway
+routing, and credential pools are useful controls, but none replaces VMGA's
+proposal-bound Gmail approval.
+
+Before exposing a Hermes-backed VMGA deployment, record:
+
+- Effective `~/.hermes/config.yaml` and `~/.hermes/.env` hashes with secrets
+  redacted.
+- Gateway allowlists or DM pairing state proving only intended senders can
+  trigger the mailbox-capable agent.
+- `approvals.mode`, `approvals.cron_mode`, `HERMES_YOLO_MODE`, and permanent
+  `command_allowlist` posture.
+- Terminal backend and Docker/remote runtime settings, including mounted
+  volumes, forwarded env vars, credential files, resource limits, and whether
+  `/var/run/docker.sock` is mounted.
+- Proof that native Hermes Gmail/Workspace tools, direct Workspace CLIs, MCP
+  servers, hooks, plugins, cron jobs, and browser sessions cannot mutate Gmail
+  outside VMGA.
+- Location and permissions for `~/.hermes/state.db`, gateway logs, VMGA evidence,
+  VMGA state, and VMGA credential material.
+
+If Hermes can read Gmail OAuth tokens, Google client secrets, VMGA verifier
+secrets, VMGA policy/evidence, or direct Workspace credentials, describe the
+deployment as advisory.
+
 ## Advisory Mode
 
 If VMGA runs in the same authority context as the agent, or if the agent can read
