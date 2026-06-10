@@ -22,3 +22,7 @@ google_client_secret.json
 .vmga/
 vmga_state/
 artifacts/**/*.sqlite3
+
+# Real-account / operator evidence; keep artifacts/vmga-dry-run tracked.
+artifacts/vmga-live-smoke/
+artifacts/vmga-release/
