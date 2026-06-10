@@ -130,8 +130,14 @@ def test_openclaw_manifest_and_route_contract():
     manifest = json.loads((ROOT / "integrations" / "openclaw" / "openclaw.plugin.json").read_text(encoding="utf-8"))
 
     assert manifest["id"] == "plugin.vmga"
-    assert manifest["configSchema"]["required"] == ["broker_url"]
     assert "broker_timeout_seconds" in manifest["configSchema"]["properties"]
+    assert manifest["contracts"]["tools"] == [
+        "mail_search",
+        "mail_get",
+        "mail_get_attachment",
+        "mail_create_draft",
+        "mail_send",
+    ]
 
 
 def test_openclaw_adapter_maps_tools_and_blocks_disallowed_paths():

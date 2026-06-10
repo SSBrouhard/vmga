@@ -1,28 +1,33 @@
 {
   "id": "plugin.vmga",
   "name": "VMGA Mail Governance",
-  "description": "OpenClaw plugin facade for VMGA-governed mailbox actions.",
+  "description": "Route OpenClaw mailbox tools through the VMGA broker.",
   "version": "1.0.0",
   "configSchema": {
     "type": "object",
     "properties": {
       "broker_url": {
         "type": "string",
-        "format": "uri"
+        "description": "VMGA broker base URL."
       },
       "broker_timeout_seconds": {
         "type": "number",
         "minimum": 1,
         "maximum": 120
-      },
-      "action_map": {
-        "type": "object",
-        "additionalProperties": {
-          "type": "string"
-        }
       }
     },
-    "required": ["broker_url"],
     "additionalProperties": false
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "mail_search",
+      "mail_get",
+      "mail_get_attachment",
+      "mail_create_draft",
+      "mail_send"
+    ]
   }
 }
