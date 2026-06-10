@@ -10,9 +10,9 @@ mailbox side effect occurs.
 
 ## Current Status
 
-This repository is being extracted from the Vesta Agent Runtime Governance
-reference implementation. The current code is a reference implementation, not a
-complete production service.
+This repository contains the standalone VMGA reference implementation extracted
+from the Vesta Agent Runtime Governance work. The current code is
+production-alpha control-plane software, not a complete hosted service.
 
 Production enforcement requires deployment controls outside this package:
 
