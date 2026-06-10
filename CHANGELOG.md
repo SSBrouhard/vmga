@@ -4,8 +4,40 @@ All notable changes to VMGA will be documented here.
 
 ## Unreleased
 
-- Added npm Dependabot coverage for the OpenClaw integration.
-- Documented upstream OpenClaw dependency advisory handling.
+## v0.2.1 - 2026-06-10
+
+### Security
+
+- Serialized proposal, approval, execution, and lockdown-reset mutations behind
+  an adapter state lock to prevent concurrent approval-token replay in the
+  single-process broker.
+- Made the fake Gmail backend honor the broker search contract (`max_results`)
+  and added a regression test that exercises the broker against the shipped
+  backend.
+- Refused unauthenticated broker startup unless `--allow-unauthenticated` is
+  set on a loopback host; non-loopback binds now require `VMGA_BROKER_TOKEN`.
+- Switched broker bearer-token comparison to a constant-time check.
+- Redacted and length-capped agent-supplied justification and reason text before
+  it is written to evidence.
+- Persisted lockdown reset so a cleared lockdown survives broker restart.
+- Expired stale SQLite rate-limit state on load.
+- Linked GitHub private vulnerability reporting in `SECURITY.md`.
+
+### Documentation
+
+- Reframed the v0.2 spec as a historical reference; clarified the standalone
+  ledger is append-only JSONL, not hash-chained, and that credential isolation
+  is a deployment precondition.
+- Documented the built-in broker as a single-process control plane and noted
+  multi-process hard enforcement needs transactional cross-process approval
+  consumption.
+- Documented `reset_lockdown` as an in-process operator maintenance API, not a
+  public broker route.
+
+### Maintenance
+
+- Added npm Dependabot coverage for the OpenClaw integration and documented the
+  upstream `hono` advisory handling.
 - Switched the repository to GitHub default CodeQL setup.
 
 ## v0.2.0 - 2026-06-10
