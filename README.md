@@ -29,13 +29,15 @@ reference control pattern, not hard isolation.
 
 VMGA's core broker path does not depend on OpenClaw. The optional OpenClaw
 integration currently tracks OpenClaw `2026.6.5` as an external runtime and test
-fixture. GitHub Dependabot may report medium-severity `hono < 4.12.21` alerts
-inside OpenClaw's shrinkwrapped npm dependency tree. Those alerts are upstream
-to the OpenClaw package, and VMGA cannot safely override them from this
-repository. Do not expose an OpenClaw-backed VMGA deployment to remote ingress
-until OpenClaw is patched or the deployment supplies an equivalent patched
-runtime with loopback/private-network binding, token or trusted-proxy auth,
-operator allowlists, sandboxing, and direct-bypass evidence.
+fixture. The OpenClaw integration's dev dependency tree includes a
+medium-severity `hono < 4.12.21` advisory inside OpenClaw's shrinkwrapped npm
+dependency tree. Production installs (`npm audit --omit=dev`) are clean, and
+GitHub Dependabot currently reports no open alerts. The vulnerable copy is
+pinned inside OpenClaw's published package, so VMGA cannot safely override it
+from this repository. Do not expose an OpenClaw-backed VMGA deployment to remote
+ingress until OpenClaw is patched or the deployment supplies an equivalent
+patched runtime with loopback/private-network binding, token or trusted-proxy
+auth, operator allowlists, sandboxing, and direct-bypass evidence.
 
 ## What VMGA Governs
 
