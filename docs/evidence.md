@@ -61,3 +61,8 @@ For the draft `v0.3.0` integrity plan, see
 `docs/evidence_integrity_design.md`. Until that design is implemented and
 anchor material is configured outside the agent authority domain, VMGA evidence
 remains append-only JSONL with advisory verification.
+
+For the draft asymmetric approval-signature plan, see
+`docs/approval_signing_design.md`. Until that design is implemented and approver
+private keys are held outside the broker and agent authority domains, VMGA
+approvals remain HMAC-based and broker-forgeable on the approval axis.
