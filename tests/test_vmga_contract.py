@@ -18,6 +18,7 @@ from vmga.approvals import approval_contract, validate_approval_dict
 from vmga.evidence import evidence_event, verify_events
 from vmga.ledger import JSONLVMGALedger, LedgerVestaAdapter
 from vmga.proposals import proposal_contract, validate_proposal_dict
+from vmga.cli import approval_token_main
 
 
 class MockLedger:
@@ -210,3 +211,26 @@ def test_jsonl_ledger_and_cli_verifier_shape(tmp_path):
     ledger = JSONLVMGALedger(ledger_path)
     ledger.append(evidence_event("vmga_proposal_received", proposal_id="p1", policy_state="DENY", error_code="vmga_test"))
     assert ledger.read_all()[0]["proposal_id"] == "p1"
+
+
+def test_approval_token_cli_matches_adapter(monkeypatch, capsys):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        adapter = make_adapter(SQLiteStateStore(str(Path(tmpdir) / "vmga.sqlite3")))
+        expected = adapter.compute_approval_token(
+            "proposal_1",
+            "sha256:" + "a" * 64,
+            "operator_1",
+            time_window="2026-06-10-04",
+        )
+        monkeypatch.setenv("VMGA_APPROVAL_SECRET", "test_secret")
+
+        exit_code = approval_token_main([
+            "proposal_1",
+            "sha256:" + "a" * 64,
+            "operator_1",
+            "--time-window",
+            "2026-06-10-04",
+        ])
+
+        assert exit_code == 0
+        assert capsys.readouterr().out.strip() == expected

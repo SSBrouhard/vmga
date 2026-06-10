@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .backends import FakeGmailBackend, GogCLIBackend
@@ -56,6 +59,37 @@ def _build_backend(args: argparse.Namespace):
         home=args.gog_home,
         timeout_seconds=args.gog_timeout,
     )
+
+
+def approval_token_main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Compute a VMGA approval token")
+    parser.add_argument("proposal_id", help="VMGA proposal id")
+    parser.add_argument("proposal_hash", help="VMGA proposal hash")
+    parser.add_argument("approver_id", help="Approver id")
+    parser.add_argument("--secret-env", default="VMGA_APPROVAL_SECRET", help="Env var containing approval HMAC secret")
+    parser.add_argument("--time-window", default=None, help="UTC approval time window, YYYY-MM-DD-HH")
+    parser.add_argument("--json", action="store_true", help="Emit JSON result")
+    args = parser.parse_args(argv)
+
+    approval_secret = os.getenv(args.secret_env)
+    if not approval_secret:
+        print(f"{args.secret_env} is required", file=sys.stderr)
+        return 2
+
+    time_window = args.time_window or datetime.now(timezone.utc).strftime("%Y-%m-%d-%H")
+    message = f"{args.proposal_id}:{args.proposal_hash}:{args.approver_id}:{time_window}"
+    token = hmac.new(approval_secret.encode(), message.encode(), hashlib.sha256).hexdigest()
+    if args.json:
+        print(json.dumps({
+            "proposal_id": args.proposal_id,
+            "proposal_hash": args.proposal_hash,
+            "approver_id": args.approver_id,
+            "time_window": time_window,
+            "approval_token": token,
+        }, indent=2, sort_keys=True))
+    else:
+        print(token)
+    return 0
 
 
 def broker_main(argv: list[str] | None = None) -> int:
