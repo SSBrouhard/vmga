@@ -25,6 +25,18 @@ Production enforcement requires deployment controls outside this package:
 Without those controls, VMGA should be described as advisory governance or a
 reference control pattern, not hard isolation.
 
+### Known Integration Advisory
+
+VMGA's core broker path does not depend on OpenClaw. The optional OpenClaw
+integration currently tracks OpenClaw `2026.6.5` as an external runtime and test
+fixture. GitHub Dependabot may report medium-severity `hono < 4.12.21` alerts
+inside OpenClaw's shrinkwrapped npm dependency tree. Those alerts are upstream
+to the OpenClaw package, and VMGA cannot safely override them from this
+repository. Do not expose an OpenClaw-backed VMGA deployment to remote ingress
+until OpenClaw is patched or the deployment supplies an equivalent patched
+runtime with loopback/private-network binding, token or trusted-proxy auth,
+operator allowlists, sandboxing, and direct-bypass evidence.
+
 ## What VMGA Governs
 
 - Read, summarize, classify, and extract actions.
