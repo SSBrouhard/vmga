@@ -24,7 +24,7 @@ Minimum broker environment:
 
 ```text
 VMGA_APPROVAL_SECRET=<operator-owned secret>
-VMGA_BROKER_TOKEN=<optional loopback bearer token>
+VMGA_BROKER_TOKEN=<operator-owned broker bearer token>
 GOG_KEYRING_PASSWORD=<operator-owned keyring password>
 VMGA_BROKER_URL=http://127.0.0.1:8765
 ```
@@ -44,6 +44,12 @@ vmga-broker \
   --ledger-rotate-bytes 10485760 \
   --ledger-backups 5
 ```
+
+The broker CLI refuses unauthenticated startup by default. Use
+`--allow-unauthenticated` only for loopback-only fake-backend development, never
+for live mailbox credentials or remote ingress. The built-in HTTP server does
+not provide TLS; put it behind an authenticated local/private-network boundary
+or an external TLS-terminating ingress when it is not loopback-only.
 
 Use `launchd`, systemd, or another operator-owned supervisor for restart and log
 capture. The supervisor wrapper should source secrets from the operator-owned

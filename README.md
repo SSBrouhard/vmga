@@ -66,7 +66,7 @@ Run the local broker with the fake backend for offline development:
 
 ```bash
 export VMGA_APPROVAL_SECRET="replace-with-a-local-dev-secret"
-vmga-broker --backend fake --policy policies/draft_assist.yaml
+vmga-broker --backend fake --policy policies/draft_assist.yaml --allow-unauthenticated
 ```
 
 For a gogcli-backed broker, point VMGA at the agent-safe wrapper and keep gog
@@ -74,6 +74,7 @@ OAuth config outside the agent-readable workspace:
 
 ```bash
 export VMGA_APPROVAL_SECRET="replace-with-a-broker-secret"
+export VMGA_BROKER_TOKEN="replace-with-a-broker-token"
 vmga-broker \
   --backend gogcli \
   --gog-binary /opt/homebrew/bin/gog-agent-safe \

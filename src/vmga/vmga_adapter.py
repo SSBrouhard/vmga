@@ -18,6 +18,7 @@ import json
 import os
 import secrets
 import tempfile
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum, auto
@@ -25,6 +26,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from .models import ExecutionRequestEnvelope, PolicyDecision
+from .redaction import redact_text
 
 
 class ActionClass(Enum):
@@ -834,6 +836,7 @@ class VMGAGmailAdapter:
         self._failed_token_attempts: Dict[str, Dict[str, Any]] = self.state_store.load_rate_limit_state()
         self._max_token_attempts = 5
         self._lockout_duration_seconds = 3600  # 1 hour
+        self._execution_lock = threading.RLock()
         
         # Load or generate approval secret
         if approval_secret is None:
@@ -1170,6 +1173,13 @@ class VMGAGmailAdapter:
         self, proposal_id: str, proposal_hash: str, approval_token: str, executor_fn: Callable,
     ) -> Dict[str, Any]:
         """Execute an approved proposal with mandatory token presentation."""
+        with self._execution_lock:
+            return self._execute_approved_locked(proposal_id, proposal_hash, approval_token, executor_fn)
+
+    def _execute_approved_locked(
+        self, proposal_id: str, proposal_hash: str, approval_token: str, executor_fn: Callable,
+    ) -> Dict[str, Any]:
+        """Execute an approved proposal while holding the adapter execution lock."""
         if proposal_id not in self.approvals:
             return {"status": "DENY", "error": "Approval not found", "error_code": "vmga_approval_not_found"}
         
@@ -1232,8 +1242,15 @@ class VMGAGmailAdapter:
         was_locked = self.lockdown_active
         self.lockdown_active = False
         self.denial_counts.clear()
+        self._save_state()
         self._log_lockdown_reset(admin_id, was_locked)
         return {"status": "RESET", "was_locked": was_locked, "admin_id": admin_id}
+
+    @staticmethod
+    def _redact_evidence_text(value: Optional[str], *, limit: int = 1000) -> Optional[str]:
+        if value is None:
+            return None
+        return redact_text(str(value))[:limit]
     
     def _log_proposal_received(
         self, proposal: Optional[VMGAProposal], status: str, decision: Optional[PolicyDecision],
@@ -1250,13 +1267,13 @@ class VMGAGmailAdapter:
             "vmga_profile": self.profile,
             "policy_state": status,
             "vesta_rule_id": decision.rule_id if decision else rule_id,
-            "vesta_reason": decision.reason if decision else reason,
+            "vesta_reason": self._redact_evidence_text(decision.reason if decision else reason),
             "risk_score": content_risk.score,
             "risk_flags": content_risk.to_dict(),
             "thread_id": proposal.thread_id if proposal else None,
             "recipient_count": len(proposal.recipients) if proposal else 0,
             "attachment_count": len(proposal.attachment_ids) if proposal else 0,
-            "justification": proposal.justification if proposal else None,
+            "justification": self._redact_evidence_text(proposal.justification) if proposal else None,
             "correlation_id": self._proposal_correlation_id(proposal),
         }
         return self._write_to_ledger(event)

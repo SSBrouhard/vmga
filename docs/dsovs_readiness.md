@@ -19,8 +19,9 @@ processes and technologies change.
 - `CODE-002` Hardcoded Secrets Detection: Release review checks committed docs,
   examples, and integration files for obvious OAuth credentials, tokens,
   approval secrets, private keys, and public Gmail account leakage.
-- `CODE-004` Static Application Security Testing: GitHub CodeQL is enabled for
-  the repository; releases should record the relevant CodeQL run status.
+- `CODE-004` Static Application Security Testing: CodeQL is expected to run
+  through GitHub default setup for the canonical repository; releases should
+  record the relevant run status rather than relying on local assumptions.
 - `CODE-005` Software Composition Analysis: Dependabot alerts and dependency
   update PRs are part of release review. Optional OpenClaw runtime findings are
   tracked as upstream integration advisories when VMGA cannot patch them safely.
