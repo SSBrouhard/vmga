@@ -4,15 +4,12 @@ All notable changes to VMGA will be documented here.
 
 ## Unreleased
 
-- Added the runtime enforcement posture self-check (`/v1/posture`,
-  `vmga-operator posture`, and broker startup summaries) so operators can see
-  when a deployment is advisory, cannot be determined, or hard-ready under
-  explicit evidence.
-- Tightened posture checks to avoid optimistic path-isolation results: agent
-  roots must be supplied explicitly, and direct Gmail/Workspace bypass closure
-  requires an evidence-referenced operator attestation.
-- Added v0.3.0 design records for tamper-evident evidence and asymmetric
-  out-of-domain approval signatures.
+- Nothing yet.
+
+## [0.3.0] - 2026-06-11
+
+### Security
+
 - Added opt-in Ed25519 approval-signature mode with broker-held public keys,
   detached signature evidence, single-use approval nonces, and an external
   `vmga-approval-sign` helper. HMAC approval remains available for advisory and
@@ -21,13 +18,6 @@ All notable changes to VMGA will be documented here.
   checkpoints, cross-file rotated-ledger verification, key rotation support,
   crash-after-append recovery, and separate CLI reporting for advisory event
   checks versus integrity state.
-- Posture now checks that signature approval mode and chain evidence modes are
-  operative, not merely declared: signature mode passes only with a loaded
-  active Ed25519 keyring, and chain modes pass only when the existing chain
-  verifier returns intact against the expected-head checkpoint. Tampered
-  ledgers fail posture, and missing key/checkpoint reports unknown with the
-  verifier's reason; declared-but-non-operative modes never count toward
-  hard-ready.
 - Added SQLite transactional approval consumption for at-most-once kinetic
   execution across independent broker processes. Approvals are consumed before
   backend execution; failures after consumption are not replayable and require a
@@ -36,8 +26,39 @@ All notable changes to VMGA will be documented here.
   type-confused approval payloads, request bit-flips, stale HMAC windows, and
   signature payload mutation; malformed bindings now deny without executing the
   backend handler.
+
+### Added
+
+- Added the runtime enforcement posture self-check (`/v1/posture`,
+  `vmga-operator posture`, and broker startup summaries) so operators can see
+  when a deployment is advisory, cannot be determined, or hard-ready under
+  explicit evidence.
+- Added canonical implemented architecture records for tamper-evident evidence
+  and asymmetric out-of-domain approval signatures.
+- Added a checked action-tier catalog in `docs/action_catalog.md`; the release
+  check asserts the catalog against live `GmailAction`, action classification,
+  default approval posture, and baseline-deny behavior.
 - Added first-class `vmga_pressure_signal` evidence for repeated denials,
   urgency or authority-language pressure, and proposal mutation attempts.
+
+### Changed
+
+- Posture now checks that signature approval mode and chain evidence modes are
+  operative, not merely declared: signature mode passes only with a loaded
+  active Ed25519 keyring, and chain modes pass only when the existing chain
+  verifier returns intact against the expected-head checkpoint. Tampered
+  ledgers fail posture, and missing key/checkpoint reports unknown with the
+  verifier's reason; declared-but-non-operative modes never count toward
+  hard-ready.
+- Tightened posture checks to avoid optimistic path-isolation results: agent
+  roots must be supplied explicitly, and direct Gmail/Workspace bypass closure
+  requires an evidence-referenced operator attestation.
+
+### Fixed
+
+- Reconciled v0.3.0 documentation so the approval-signing and evidence-integrity
+  records describe implemented architecture, and the v0.2 spec points readers
+  to the current signature and hash-chained ledger boundaries.
 
 ## v0.2.1 - 2026-06-10
 

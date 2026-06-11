@@ -1,22 +1,23 @@
-# Approval Signing Design
+# Approval Signing Architecture Record
 
-Status: implemented design record for `v0.3.0` issue #24. This document defines
-the approval-signature boundary. Signature mode changes VMGA approval behavior
-only when configured with approver public keys and when approver private keys
-are held outside the broker and agent authority domains. HMAC approval remains
-available and broker-forgeable on the approval axis.
+Status: canonical implemented architecture record for the `v0.3.0` approval
+signature milestone. This document defines the approval-signature boundary
+implemented by VMGA. Signature mode changes VMGA approval behavior only when
+configured with approver public keys and when approver private keys are held
+outside the broker and agent authority domains. HMAC approval remains available
+and broker-forgeable on the approval axis.
 
 ## Goal
 
-VMGA should support asymmetric, out-of-domain approval signatures for hard
+VMGA supports asymmetric, out-of-domain approval signatures for hard
 approval-enforcement claims. The broker verifies an approver's detached
 signature over the approval binding message, but never holds the approver's
 private key.
 
-Ed25519 is the preferred signature scheme because it is deterministic and has a
-small, well-understood API surface. ECDSA P-256 is acceptable if platform
-constraints require it, but the implementation must still expose the same
-deterministic VMGA signing payload and fail-closed verification semantics.
+Ed25519 is the implemented signature scheme because it is deterministic and has
+a small, well-understood API surface. Any future signature scheme must preserve
+the same deterministic VMGA signing payload, algorithm/keyring matching, and
+fail-closed verification semantics before it can be counted as equivalent.
 
 This detects:
 
@@ -92,8 +93,8 @@ declared for that `key_id` in the keyring, so an attacker cannot present a
 signature under one scheme against a key registered under another
 (algorithm-confusion).
 
-A signature must not be replayable across proposals, approvers, keys, time
-windows, or nonces. The broker persists nonce use and denies any replay. Nonce
+Signatures are not replayable across proposals, approvers, keys, time windows,
+or nonces. The broker persists nonce use and denies any replay. Nonce
 records are retained only for the maximum approval validity horizon (the policy
 approval TTL plus the time-window grace) and pruned past it, so nonce state
 cannot grow unbounded or be used to bloat broker state into the fail-closed
@@ -127,9 +128,9 @@ under retained historical public keys. Unknown `key_id`, removed key material,
 or an approver/key mismatch denies verification.
 
 Hardware-backed signing, such as YubiKey/PIV or SSH security-key signing, is
-allowed by the design but out of scope for the first implementation. The first
-implementation may use an operator-side CLI signer as long as the private key
-remains outside the broker and agent authority domains.
+compatible with the boundary but not required by VMGA's current implementation.
+The shipped operator-side CLI signer satisfies the architecture only when the
+private key remains outside the broker and agent authority domains.
 
 ## Verification States And Fail-Closed Behavior
 
@@ -158,9 +159,9 @@ unless the operator explicitly configures HMAC mode.
 ## Compatibility And Modes
 
 HMAC approval remains available for advisory, local development, and backward
-compatibility. It must continue to work with existing CLI flows and tests.
+compatibility. It continues to work with existing CLI flows and tests.
 
-VMGA should make the approval mode explicit, for example:
+VMGA records the approval mode explicitly, for example:
 
 ```yaml
 approval_auth: hmac        # advisory/dev compatibility
@@ -179,16 +180,16 @@ otherwise not isolated.
 
 ## Relationship To Evidence Integrity
 
-This design is cross-linked with issue #2 and
+This architecture is cross-linked with
 `docs/evidence_integrity_design.md`. Approval signing and evidence-chain
 checkpoint signing are the same boundary problem: VMGA needs an anchor the
 broker cannot forge.
 
-The operator approver key is a candidate Tier 2/3 evidence checkpoint signer.
-The approval-signature implementation must not preclude reusing the same
-operator-held key, or another key under the same operator boundary, to sign
+The operator approver key is a possible future Tier 2/3 evidence checkpoint
+signer. The approval-signature implementation does not preclude reusing the
+same operator-held key, or another key under the same operator boundary, to sign
 evidence-chain checkpoints. If the same key is used for both approvals and
-evidence checkpoints, signed payloads must be domain-separated by
+evidence checkpoints, signed payloads are domain-separated by
 `signature_version` and payload type so an approval signature cannot verify as
 an evidence checkpoint signature, or vice versa.
 
@@ -223,16 +224,16 @@ independently re-verifiable later against the approver public key, which feeds
 the evidence-integrity story in #2. Raw private-key material is never logged or
 persisted.
 
-## Related Follow-Up Issues
+## Related Implemented Records
 
 - #2: tamper-evident evidence ledger and verification command.
 - #24: asymmetric out-of-domain approval signatures.
 - #25: action-tier catalog derived from real code classification.
 - #26: multi-turn pressure evidence.
 
-## Acceptance Gates
+## Implementation Coverage
 
-Implementation for issue #24 should not be considered complete until:
+The v0.3.0 implementation covers the approval-signature boundary as follows:
 
 - docs state the key-isolation boundary and private-key compromise residual
   plainly;
@@ -261,6 +262,6 @@ Implementation for issue #24 should not be considered complete until:
   approver private-key isolation holds;
 - tests cover valid signature, wrong key, tampered message, expired signature,
   replayed nonce, unknown approver, key rotation, old key verifying historical
-  records, and removed key denial;
+  records, removed key denial, and signature-payload mutation;
 - README/spec/runbook wording remains advisory for deployments where the
   approver private key is not isolated.

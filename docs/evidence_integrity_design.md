@@ -1,14 +1,14 @@
-# Evidence Integrity Design
+# Evidence Integrity Architecture Record
 
-Status: implemented design record for `v0.3.0` issue #2. This document defines
-the Tier-1 tamper-evidence boundary. The implementation upgrades VMGA evidence
-only when anchor material is configured outside the agent authority domain;
-without that material, VMGA evidence remains append-only JSONL with advisory
-verification.
+Status: canonical implemented architecture record for the `v0.3.0` evidence
+integrity milestone. This document defines the Tier-1 tamper-evidence boundary
+implemented by VMGA. Integrity mode upgrades VMGA evidence only when anchor
+material is configured outside the agent authority domain; without that
+material, VMGA evidence remains append-only JSONL with advisory verification.
 
 ## Goal
 
-VMGA should make post-hoc evidence modification detectable under an explicit
+VMGA makes post-hoc evidence modification detectable under an explicit
 trust boundary. The target is tamper-evident evidence, not storage that prevents
 all possible modification.
 VMGA cannot prevent a writer with filesystem access from deleting or rewriting
@@ -34,7 +34,7 @@ signer, append-only/WORM sink, or timestamping service.
 
 ## Record Commitment
 
-Each integrity-protected record should carry integrity metadata in addition to
+Each integrity-protected record carries integrity metadata in addition to
 the existing evidence payload:
 
 ```json
@@ -82,7 +82,7 @@ A pure hash or HMAC chain detects mutation, insertion, middle deletion, and
 reordering, but not deletion of the last N records when the truncated ledger is
 otherwise internally consistent. Tier 1 therefore requires an expected head.
 
-For Tier 1, the broker should persist an expected-head checkpoint outside the
+For Tier 1, the broker persists an expected-head checkpoint outside the
 JSONL file but inside the operator-owned broker state:
 
 ```json
@@ -186,7 +186,7 @@ Pre-`v0.3.0` evidence has no integrity metadata. The existing `verify_events`
 sequence and leak checks remain valid as advisory evidence checks, but they are
 a separate dimension from integrity verification.
 
-Legacy or unanchored ledgers should report:
+Legacy or unanchored ledgers report:
 
 ```json
 {
@@ -199,11 +199,11 @@ Legacy or unanchored ledgers should report:
 ```
 
 They must not be silently upgraded to `verified_intact`. CLI and JSON output
-should make the distinction obvious.
+makes the distinction explicit.
 
 ## Key Handling And Rotation
 
-The HMAC key should be supplied from an operator-owned secret source, equivalent
+The HMAC key is supplied from an operator-owned secret source, equivalent
 to the `VMGA_APPROVAL_SECRET` isolation story and outside the agent-readable
 workspace. A likely default is:
 
@@ -278,30 +278,30 @@ explicitly:
 - Verification is defined over the ordered retained segment set, not a single
   file.
 
-Tier 1 requires one of the following; the implementation must pick and document
-which:
+Tier 1 uses cross-file verification for the built-in JSONL ledger:
 
-1. Cross-file verification (default). The verifier takes the ordered retained
-   set from oldest backup through active file, checks MAC validity within each
-   segment, checks `prev_mac` and `sequence` continuity across segment seams,
-   anchors the newest record to the expected head and the oldest retained
-   record to the genesis anchor, and verifies the retained range is contiguous
-   with no missing segment. A gap between segments, such as a deleted backup, is
-   `verified_tampered`. A retained set whose oldest record is neither genesis
-   nor continuous with an absent-but-expected older segment is
-   `verified_tampered`, not `verified_intact`.
-2. External sink. Internal rotation is disabled when integrity is enabled and
-   the ledger is shipped to an external append-only/WORM sink, moving the anchor
-   out of the broker domain (Tier 2/3).
+The verifier takes the ordered retained set from oldest backup through active
+file, checks MAC validity within each segment, checks `prev_mac` and `sequence`
+continuity across segment seams, anchors the newest record to the expected head
+and the oldest retained record to the genesis anchor, and verifies the retained
+range is contiguous with no missing segment. A gap between segments, such as a
+deleted backup, is `verified_tampered`. A retained set whose oldest record is
+neither genesis nor continuous with an absent-but-expected older segment is
+`verified_tampered`, not `verified_intact`.
+
+External append-only or WORM storage remains the Tier 2/3 path when a deployment
+needs history outside the retained local rotation set or an anchor outside the
+broker domain.
 
 Documented residual: history rotated out of the retained set, meaning records
 older than the oldest retained backup, is outside Tier 1's detection scope. The
 expected head and genesis anchor cover the retained range only; pruned history
 requires an external sink to remain verifiable.
 
-## Acceptance Gates
+## Implementation Coverage
 
-Implementation for issue #2 should not be considered complete until:
+The v0.3.0 implementation covers the Tier-1 evidence-integrity boundary as
+follows:
 
 - docs state the Tier 1 compromised-broker residual plainly;
 - writer and verifier use the same deterministic canonicalization;
@@ -316,7 +316,8 @@ Implementation for issue #2 should not be considered complete until:
 - prefix truncation, a forged genesis, and a deleted rotated segment all fail
   closed;
 - verification is defined over the ordered retained segment set, and the
-  rotation strategy, cross-file verification or external sink, is documented;
+  rotation strategy is documented as cross-file verification for the built-in
+  JSONL ledger;
 - startup recovery for the crash-after-append case is defined and tested;
 - tests cover mutation, insertion, middle deletion, reordering, tail
   truncation, prefix truncation, segment-gap deletion, cross-seam continuity,
