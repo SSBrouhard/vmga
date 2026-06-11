@@ -4,7 +4,8 @@ All notable changes to VMGA will be documented here.
 
 ## Unreleased
 
-- Nothing yet.
+- Added a safe local fixture playground with fake mailbox data, deterministic
+  terminal evidence logs, replay-denial output, and no Gmail/OAuth dependency.
 
 ## [0.3.0] - 2026-06-11
 

@@ -26,3 +26,4 @@ artifacts/**/*.sqlite3
 # Real-account / operator evidence; keep artifacts/vmga-dry-run tracked.
 artifacts/vmga-live-smoke/
 artifacts/vmga-release/
+artifacts/vmga-fixture-playground/

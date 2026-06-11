@@ -175,6 +175,7 @@ def _collect_scannable_files(root: Path) -> list[Path]:
             "docs/**/*.md",
             "examples/**/*.yaml",
             "examples/**/*.yml",
+            "examples/**/*.json",
             "policies/**/*.yaml",
             "policies/**/*.yml",
         ],

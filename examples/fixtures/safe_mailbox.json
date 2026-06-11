@@ -1,0 +1,21 @@
+{
+  "fx_msg_001": {
+    "sender": "billing@example.com",
+    "subject": "Example invoice question",
+    "body": "Hello team, can you confirm whether invoice EXAMPLE-001 was received?",
+    "thread_id": "fx_thread_invoice",
+    "attachments": []
+  },
+  "fx_msg_002": {
+    "sender": "ops@example.com",
+    "subject": "Example internal status",
+    "body": "This is a fixture-only status note for VMGA local demos.",
+    "thread_id": "fx_thread_status",
+    "attachments": [
+      {
+        "attachment_id": "fx_attachment_001",
+        "filename": "example-note.txt"
+      }
+    ]
+  }
+}
