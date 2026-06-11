@@ -1611,18 +1611,28 @@ class VMGAGmailAdapter:
 
         execution_result = None
         error_info = None
-        success = False
 
         try:
             result = self.vesta.execute(request, executor_fn)
             tool_output = getattr(result, "tool_output", getattr(result, "output", None))
-            execution_result = {
-                "status": "SUCCESS",
-                "request_id": result.request_id,
-                "duration_ms": result.duration_ms,
-                "tool_output": tool_output,
-            }
-            success = True
+            backend_status = tool_output.get("status") if isinstance(tool_output, dict) else None
+            if backend_status in {"DENY", "ERROR"}:
+                error_info = str(tool_output.get("error") or "Backend execution failed")
+                execution_result = {
+                    "status": backend_status,
+                    "request_id": result.request_id,
+                    "duration_ms": result.duration_ms,
+                    "error": error_info,
+                    "error_code": tool_output.get("error_code", "vmga_backend_execution_failed"),
+                    "tool_output": tool_output,
+                }
+            else:
+                execution_result = {
+                    "status": "SUCCESS",
+                    "request_id": result.request_id,
+                    "duration_ms": result.duration_ms,
+                    "tool_output": tool_output,
+                }
         except Exception as e:
             error_info = str(e)
             execution_result = {"status": "ERROR", "error": error_info, "error_code": "vmga_execution_failed"}
