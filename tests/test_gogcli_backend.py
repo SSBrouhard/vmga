@@ -187,3 +187,38 @@ def test_executor_passes_approval_bound_payload_to_backend():
         assert backend.payload["content"] == "Approved body"
         assert backend.payload["parameters"]["subject"] == "Approved subject"
         assert backend.payload["recipients"] == ["ops@example.com"]
+
+
+def test_executor_surfaces_backend_failure_and_consumes_approval():
+    class FailingBackend:
+        def execute(self, action, payload):
+            return {
+                "status": "ERROR",
+                "backend": "gogcli",
+                "error_code": "vmga_gogcli_failed",
+                "error": "credential unlock failed",
+            }
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        adapter = make_adapter(SQLiteStateStore(str(Path(tmpdir) / "vmga.sqlite3")))
+        executor = VMGAExecutor(adapter, FailingBackend())
+        proposed = adapter.propose_action(
+            "create_draft",
+            "agent_1",
+            recipients=["ops@example.com"],
+            content="Approved body",
+            parameters={"subject": "Approved subject"},
+            justification="Test",
+        )
+        token = adapter.compute_approval_token(proposed["proposal_id"], proposed["proposal_hash"], "operator_1")
+        adapter.approve_proposal(proposed["proposal_id"], "operator_1", token)
+
+        result = executor.execute_approved(proposed["proposal_id"], proposed["proposal_hash"], token)
+        replay = executor.execute_approved(proposed["proposal_id"], proposed["proposal_hash"], token)
+
+        assert result["status"] == "ERROR"
+        assert result["error_code"] == "vmga_gogcli_failed"
+        assert result["error"] == "credential unlock failed"
+        assert result["tool_output"]["backend"] == "gogcli"
+        assert replay["status"] == "DENY"
+        assert replay["error_code"] == "vmga_approval_already_used"
