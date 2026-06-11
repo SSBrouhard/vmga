@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from .evidence_integrity import EvidenceHMACConfig, load_segmented_events, verify_integrity
+
 
 PASS = "pass"
 WARN = "warn"
@@ -31,6 +33,10 @@ class PostureConfig:
     agent_roots: List[str] = field(default_factory=list)
     direct_bypass_attested: bool = False
     direct_bypass_evidence: str = ""
+    # Operative signal from the adapter's signature-mode readiness computation
+    # (VMGAGmailAdapter.signature_readiness). Posture consumes it, never
+    # recomputes it. None means the signal is unavailable (e.g. --local).
+    signature_readiness: Optional[Dict[str, str]] = None
 
 
 def _resolve(path: str | Path) -> Path:
@@ -59,6 +65,35 @@ def _check(check_id: str, status: str, summary: str, *, detail: str = "") -> Dic
     if detail:
         payload["detail"] = detail
     return payload
+
+
+def _evidence_chain_result(config: PostureConfig) -> Dict[str, str]:
+    """Run the existing evidence-chain verifier for posture.
+
+    This is wiring only: key material comes from the environment via
+    EvidenceHMACConfig, the expected head from the state DB, and the verdict
+    from verify_integrity. Posture never reimplements the chain check. Any
+    missing input is cannot_verify, never pass.
+    """
+    try:
+        hmac_config = EvidenceHMACConfig.from_env()
+    except ValueError as exc:
+        return {"state": "cannot_verify", "reason": str(exc)}
+    if hmac_config is None:
+        return {"state": "cannot_verify", "reason": "missing_evidence_hmac_key"}
+    try:
+        from .sqlite_state import SQLiteStateStore
+
+        checkpoint = SQLiteStateStore(config.state_db_path).load_evidence_head()
+        events = load_segmented_events(config.ledger_path)
+    except Exception as exc:  # noqa: BLE001 - any unreadable input fails closed to cannot_verify
+        return {"state": "cannot_verify", "reason": f"unreadable_inputs: {exc}"}
+    result = verify_integrity(
+        events,
+        checkpoint=checkpoint,
+        keyring={hmac_config.key_id: hmac_config.key},
+    )
+    return {"state": result.state, "reason": result.reason}
 
 
 def assess_posture(config: PostureConfig) -> Dict[str, Any]:
@@ -92,14 +127,46 @@ def assess_posture(config: PostureConfig) -> Dict[str, Any]:
         checks.append(_check("mailbox_backend", UNKNOWN, f"Unknown backend posture: {config.backend}"))
 
     if config.approval_auth == "signature":
-        checks.append(_check("approval_boundary", PASS, "Asymmetric approval mode is configured. Verify private-key isolation separately."))
+        readiness = config.signature_readiness
+        if readiness is not None and readiness.get("state") == "verified_intact":
+            checks.append(_check(
+                "approval_boundary", PASS,
+                "Asymmetric approval mode is operative: active Ed25519 keyring loaded. Verify private-key isolation separately.",
+                detail=readiness.get("reason", ""),
+            ))
+        else:
+            checks.append(_check(
+                "approval_boundary", WARN,
+                "Signature mode declared but no keyring loaded; approval enforcement is not operative.",
+                detail=(readiness or {}).get("reason", "signature_readiness_unavailable"),
+            ))
     elif config.approval_auth == "hmac":
         checks.append(_check("approval_boundary", WARN, "HMAC approval is broker-forgeable; hard approval enforcement requires signature mode."))
     else:
         checks.append(_check("approval_boundary", UNKNOWN, f"Unknown approval mode: {config.approval_auth}"))
 
     if config.evidence_integrity in {"hmac_chain", "signed_checkpoint", "external_anchor"}:
-        checks.append(_check("evidence_integrity", PASS, f"Evidence integrity mode configured: {config.evidence_integrity}."))
+        chain_result = _evidence_chain_result(config)
+        chain_state = chain_result.get("state")
+        chain_reason = chain_result.get("reason", "")
+        if chain_state == "verified_intact":
+            checks.append(_check(
+                "evidence_integrity", PASS,
+                f"Evidence integrity mode {config.evidence_integrity} is operative: chain verified intact against the expected-head checkpoint.",
+                detail=chain_reason,
+            ))
+        elif chain_state == "verified_tampered":
+            checks.append(_check(
+                "evidence_integrity", FAIL,
+                f"Evidence integrity mode {config.evidence_integrity} is declared but the ledger FAILED verification: {chain_reason}.",
+                detail=chain_reason,
+            ))
+        else:
+            checks.append(_check(
+                "evidence_integrity", UNKNOWN,
+                f"Evidence integrity mode {config.evidence_integrity} is declared but the chain cannot be verified from here: {chain_reason}.",
+                detail=chain_reason,
+            ))
     elif config.evidence_integrity == "append_only":
         checks.append(_check("evidence_integrity", WARN, "Evidence is append-only/advisory; integrity anchoring is not configured."))
     else:

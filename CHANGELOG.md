@@ -21,6 +21,13 @@ All notable changes to VMGA will be documented here.
   checkpoints, cross-file rotated-ledger verification, key rotation support,
   crash-after-append recovery, and separate CLI reporting for advisory event
   checks versus integrity state.
+- Posture now checks that signature approval mode and chain evidence modes are
+  operative, not merely declared: signature mode passes only with a loaded
+  active Ed25519 keyring, and chain modes pass only when the existing chain
+  verifier returns intact against the expected-head checkpoint. Tampered
+  ledgers fail posture, and missing key/checkpoint reports unknown with the
+  verifier's reason; declared-but-non-operative modes never count toward
+  hard-ready.
 
 ## v0.2.1 - 2026-06-10
 

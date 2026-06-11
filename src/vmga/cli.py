@@ -449,6 +449,8 @@ def broker_main(argv: list[str] | None = None) -> int:
         agent_roots=args.agent_root or [],
         direct_bypass_attested=args.attest_no_direct_bypass,
         direct_bypass_evidence=args.direct_bypass_evidence,
+        approval_auth=args.approval_auth,
+        signature_readiness=adapter.signature_readiness,
     )
     broker = VMGABroker(adapter, executor, backend=backend, posture_config=posture_config)
     server = make_server(args.host, args.port, broker, bearer_token=bearer_token)
