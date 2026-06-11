@@ -194,6 +194,23 @@ def _validate_text_field(field_name: str, value: Any) -> None:
         raise ValueError(f"{field_name} contains disallowed hidden/control characters")
 
 
+def validate_email_list(field_name: str, value: Any) -> None:
+    """Validate a required list of bare non-IDN ASCII email addresses."""
+    if not isinstance(value, list):
+        raise ValueError(f"{field_name} must be a list")
+    _validate_email_field(field_name, value, allow_list=True)
+
+
+def validate_single_line_value(field_name: str, value: Any) -> None:
+    """Validate a scalar single-line value for backend sinks."""
+    _validate_single_line(field_name, value)
+
+
+def validate_multiline_text_value(field_name: str, value: Any) -> None:
+    """Validate multiline text before it is passed to a backend sink."""
+    _validate_text_field(field_name, value)
+
+
 def _validate_max_results(value: Any) -> None:
     if value is None:
         return

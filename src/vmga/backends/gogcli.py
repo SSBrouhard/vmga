@@ -10,6 +10,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from ..broker_contract import validate_email_list, validate_multiline_text_value, validate_single_line_value
+
 
 DEFAULT_ALLOWED_COMMANDS = "gmail.search,gmail.get,gmail.drafts.create"
 
@@ -150,14 +152,31 @@ class GogCLIBackend:
             }
 
         parameters = payload.get("parameters") or {}
-        recipients = [str(item) for item in payload.get("recipients", []) if str(item).strip()]
+        raw_recipients = payload.get("recipients", [])
         content = payload.get("content")
         subject = str(parameters.get("subject") or "VMGA draft")
-        if not recipients:
+        if not raw_recipients:
             return {"status": "DENY", "backend": "gogcli", "error_code": "vmga_gogcli_recipients_required"}
         if not isinstance(content, str) or not content.strip():
             return {"status": "DENY", "backend": "gogcli", "error_code": "vmga_gogcli_content_required"}
+        try:
+            validate_email_list("recipients", raw_recipients)
+            validate_single_line_value("parameters.subject", subject)
+            validate_multiline_text_value("content", content)
+            if payload.get("thread_id"):
+                validate_single_line_value("thread_id", payload["thread_id"])
+            reply_to_message_id = parameters.get("reply_to_message_id")
+            if reply_to_message_id:
+                validate_single_line_value("parameters.reply_to_message_id", reply_to_message_id)
+        except ValueError as exc:
+            return {
+                "status": "DENY",
+                "backend": "gogcli",
+                "error_code": "vmga_gogcli_invalid_payload",
+                "error": str(exc),
+            }
 
+        recipients = [str(item).strip() for item in raw_recipients]
         command = [
             "gmail",
             "drafts",
@@ -168,7 +187,6 @@ class GogCLIBackend:
         ]
         if payload.get("thread_id"):
             command.append(f"--thread-id={payload['thread_id']}")
-        reply_to_message_id = parameters.get("reply_to_message_id")
         if reply_to_message_id:
             command.append(f"--reply-to-message-id={reply_to_message_id}")
         return self._run(command, input_text=content)
