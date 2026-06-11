@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from typing import Any, Mapping
 
 MAX_CONTENT_CHARS = 200_000
@@ -9,6 +10,7 @@ MAX_SCALAR_CHARS = 4_096
 MAX_LIST_ITEMS = 100
 MAX_RESULTS_LIMIT = 100
 CONTROL_CHARS = ("\r", "\n", "\x00")
+MULTILINE_ALLOWED_CONTROLS = {"\n", "\t"}
 
 BROKER_PROPOSAL_FIELDS = {
     "action",
@@ -85,25 +87,97 @@ MULTILINE_TEXT_FIELDS = {
     "justification",
 }
 
+EMAIL_LIST_FIELDS = {
+    "recipients",
+}
+
+EMAIL_SINGLE_OR_LIST_FIELDS = {
+    "bcc",
+    "cc",
+}
+
+EMAIL_SINGLE_FIELDS = {
+    "reply_to",
+    "sender",
+}
+
 
 def _has_control_chars(value: str) -> bool:
     return any(char in value for char in CONTROL_CHARS)
 
 
-def _validate_single_line(field_name: str, value: Any) -> None:
+def _has_hidden_or_control_chars(value: str, *, allow_multiline: bool = False) -> bool:
+    for char in value:
+        if allow_multiline and char in MULTILINE_ALLOWED_CONTROLS:
+            continue
+        if unicodedata.category(char) in {"Cc", "Cf"}:
+            return True
+    return False
+
+
+def _require_nfkc(field_name: str, value: str) -> None:
+    if unicodedata.normalize("NFKC", value) != value:
+        raise ValueError(f"{field_name} must be NFKC-normalized")
+
+
+def _validate_email_address(field_name: str, value: Any) -> None:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be an email address string")
+    address = value.strip()
+    if not address:
+        raise ValueError(f"{field_name} must not be empty")
+    if any(token in address for token in ("<", ">", ",")):
+        raise ValueError(f"{field_name} must be a bare email address")
+    if _has_hidden_or_control_chars(address):
+        raise ValueError(f"{field_name} contains disallowed control characters")
+    _require_nfkc(field_name, address)
+    if address.count("@") != 1:
+        raise ValueError(f"{field_name} must contain one @")
+    local_part, domain = address.rsplit("@", 1)
+    if not local_part or not domain:
+        raise ValueError(f"{field_name} must contain local and domain parts")
+    try:
+        local_part.encode("ascii")
+        ascii_domain = domain.encode("idna").decode("ascii")
+    except UnicodeError as exc:
+        raise ValueError(f"{field_name} must use ASCII email syntax") from exc
+    if ascii_domain != domain.lower() or any(label.startswith("xn--") for label in ascii_domain.split(".")):
+        raise ValueError(f"{field_name} must use a non-IDN ASCII domain")
+
+
+def _validate_email_field(field_name: str, value: Any, *, allow_list: bool = False) -> None:
+    if value is None:
+        return
+    if isinstance(value, list):
+        if not allow_list:
+            raise ValueError(f"{field_name} must be a scalar")
+        if len(value) > MAX_LIST_ITEMS:
+            raise ValueError(f"{field_name} exceeds maximum item count")
+        for item in value:
+            _validate_email_address(field_name, item)
+        return
+    _validate_email_address(field_name, value)
+
+
+def _validate_single_line(field_name: str, value: Any, *, allow_list: bool = False) -> None:
     if value is None:
         return
     if isinstance(value, (str, int, float)):
         text = str(value)
         if len(text) > MAX_SCALAR_CHARS:
             raise ValueError(f"{field_name} exceeds maximum length")
-        if _has_control_chars(text):
+        if _has_control_chars(text) or _has_hidden_or_control_chars(text):
             raise ValueError(f"{field_name} contains disallowed control characters")
+        _require_nfkc(field_name, text)
         return
     if isinstance(value, list):
+        if not allow_list:
+            raise ValueError(f"{field_name} must be a scalar")
         if len(value) > MAX_LIST_ITEMS:
             raise ValueError(f"{field_name} exceeds maximum item count")
         for item in value:
+            if isinstance(item, list):
+                raise ValueError(f"{field_name} must not contain nested lists")
             _validate_single_line(field_name, item)
         return
     raise ValueError(f"{field_name} must be a scalar or list of scalars")
@@ -116,6 +190,8 @@ def _validate_text_field(field_name: str, value: Any) -> None:
         raise ValueError(f"{field_name} must be a string")
     if len(value) > MAX_CONTENT_CHARS:
         raise ValueError(f"{field_name} exceeds maximum length")
+    if _has_hidden_or_control_chars(value, allow_multiline=True):
+        raise ValueError(f"{field_name} contains disallowed hidden/control characters")
 
 
 def _validate_max_results(value: Any) -> None:
@@ -147,16 +223,33 @@ def _validate_parameters(action: str, parameters: Any) -> None:
         if key == "max_results":
             _validate_max_results(value)
             continue
+        if key in EMAIL_SINGLE_OR_LIST_FIELDS:
+            _validate_email_field(f"parameters.{key}", value, allow_list=True)
+            continue
+        if key in EMAIL_SINGLE_FIELDS:
+            _validate_email_field(f"parameters.{key}", value)
+            continue
         _validate_single_line(f"parameters.{key}", value)
 
 
 def _validate_payload_values(payload: Mapping[str, Any]) -> None:
     for field_name in SINGLE_LINE_TOP_LEVEL_FIELDS:
         if field_name in payload:
+            if field_name in EMAIL_SINGLE_OR_LIST_FIELDS or field_name in EMAIL_SINGLE_FIELDS:
+                continue
             _validate_single_line(field_name, payload[field_name])
     for field_name in SINGLE_LINE_LIST_FIELDS:
         if field_name in payload:
-            _validate_single_line(field_name, payload[field_name])
+            if field_name in EMAIL_LIST_FIELDS:
+                _validate_email_field(field_name, payload[field_name], allow_list=True)
+                continue
+            _validate_single_line(field_name, payload[field_name], allow_list=True)
+    for field_name in EMAIL_SINGLE_OR_LIST_FIELDS:
+        if field_name in payload:
+            _validate_email_field(field_name, payload[field_name], allow_list=True)
+    for field_name in EMAIL_SINGLE_FIELDS:
+        if field_name in payload:
+            _validate_email_field(field_name, payload[field_name])
     for field_name in MULTILINE_TEXT_FIELDS:
         if field_name in payload:
             _validate_text_field(field_name, payload[field_name])

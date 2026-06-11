@@ -132,13 +132,13 @@ class GogCLIBackend:
         query = str(query).strip()
         if not query:
             return {"status": "DENY", "backend": "gogcli", "error_code": "vmga_gogcli_query_required"}
-        return self._run(["gmail", "search", query, "--max", str(max_results)])
+        return self._run(["gmail", "search", "--max", str(max_results), "--", query])
 
     def read(self, message_id: str) -> Dict[str, Any]:
         message_id = str(message_id).strip()
         if not message_id:
             return {"status": "DENY", "backend": "gogcli", "error_code": "vmga_gogcli_message_id_required"}
-        return self._run(["gmail", "get", message_id, "--format", "full", "--sanitize-content"])
+        return self._run(["gmail", "get", "--format", "full", "--sanitize-content", "--", message_id])
 
     def execute(self, action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         if action != "create_draft":
@@ -162,16 +162,13 @@ class GogCLIBackend:
             "gmail",
             "drafts",
             "create",
-            "--to",
-            ",".join(recipients),
-            "--subject",
-            subject,
-            "--body-file",
-            "-",
+            f"--to={','.join(recipients)}",
+            f"--subject={subject}",
+            "--body-file=-",
         ]
         if payload.get("thread_id"):
-            command.extend(["--thread-id", str(payload["thread_id"])])
+            command.append(f"--thread-id={payload['thread_id']}")
         reply_to_message_id = parameters.get("reply_to_message_id")
         if reply_to_message_id:
-            command.extend(["--reply-to-message-id", str(reply_to_message_id)])
+            command.append(f"--reply-to-message-id={reply_to_message_id}")
         return self._run(command, input_text=content)
