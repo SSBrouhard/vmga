@@ -123,11 +123,20 @@ callers can read while another request writes. This is not a queue by itself;
 high-volume batch callers should still serialize kinetic work at the agent or
 operator layer.
 
-The built-in broker is designed as a single-process control plane. Its adapter
-state lock serializes proposal, approval, execution, and lockdown-reset
-mutations inside that process. Do not run multiple broker processes against the
-same state database for hard-enforcement claims unless approval consumption is
-made transactional across processes.
+VMGA uses at-most-once approval-consumption semantics for kinetic execution.
+With `SQLiteStateStore`, an approval is transactionally marked `used` before the
+backend side effect begins; concurrent broker processes against the same SQLite
+database cannot both consume the same approval. If the broker or backend fails
+after consumption but before the mailbox side effect completes, replay is denied
+on restart. That can lose a draft/send attempt, but it fails safer than
+replaying a mailbox side effect. Operators should inspect evidence and submit a
+new proposal when a consumed execution fails.
+
+The built-in broker still uses an in-process adapter lock for proposal,
+approval, execution, and lockdown-reset mutations inside one process. For
+hard-enforcement claims, multi-process deployments must use the SQLite state
+store or another state backend with equivalent transactional consume before
+execution semantics.
 
 Each broker proposal receives a `correlation_id`. Supplying one in the request
 preserves the caller's ID; otherwise the broker generates one. Proposal, state,

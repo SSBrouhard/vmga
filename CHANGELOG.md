@@ -28,6 +28,10 @@ All notable changes to VMGA will be documented here.
   ledgers fail posture, and missing key/checkpoint reports unknown with the
   verifier's reason; declared-but-non-operative modes never count toward
   hard-ready.
+- Added SQLite transactional approval consumption for at-most-once kinetic
+  execution across independent broker processes. Approvals are consumed before
+  backend execution; failures after consumption are not replayable and require a
+  new proposal.
 
 ## v0.2.1 - 2026-06-10
 
