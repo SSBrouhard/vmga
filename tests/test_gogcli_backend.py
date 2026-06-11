@@ -56,7 +56,7 @@ def test_gogcli_search_uses_list_command_and_safe_flags():
     assert "--gmail-no-send" in command
     assert "--no-input" in command
     assert "--enable-commands-exact=gmail.search,gmail.get,gmail.drafts.create" in command
-    assert command[-5:] == ["gmail", "search", "from:test@example.com", "--max", "3"]
+    assert command[-6:] == ["gmail", "search", "--max", "3", "--", "from:test@example.com"]
     assert result["status"] == "SUCCESS"
     assert result["result"] == {"messages": []}
 
@@ -75,11 +75,36 @@ def test_gogcli_create_draft_sends_body_on_stdin_not_command_line():
         )
 
     command = run.call_args.args[0]
-    assert "--body-file" in command
-    assert command[command.index("--body-file") + 1] == "-"
+    assert "--body-file=-" in command
     assert "Bound draft body" not in command
     assert run.call_args.kwargs["input"] == "Bound draft body"
     assert result["status"] == "SUCCESS"
+
+
+def test_gogcli_isolates_option_like_user_values():
+    completed = subprocess.CompletedProcess(args=[], returncode=0, stdout='{"messages":[]}', stderr="")
+    with patch("vmga.backends.gogcli.subprocess.run", return_value=completed) as run:
+        backend = GogCLIBackend(binary="/opt/homebrew/bin/gog-agent-safe")
+        backend.search("--config=/tmp/evil", max_results=1)
+
+    command = run.call_args.args[0]
+    assert command[-6:] == ["gmail", "search", "--max", "1", "--", "--config=/tmp/evil"]
+
+    completed = subprocess.CompletedProcess(args=[], returncode=0, stdout='{"id":"draft_1"}', stderr="")
+    with patch("vmga.backends.gogcli.subprocess.run", return_value=completed) as run:
+        backend = GogCLIBackend(binary="/opt/homebrew/bin/gog-agent-safe")
+        backend.execute(
+            "create_draft",
+            {
+                "recipients": ["ops@example.com"],
+                "content": "Body",
+                "parameters": {"subject": "--config=/tmp/evil"},
+            },
+        )
+
+    command = run.call_args.args[0]
+    assert "--subject=--config=/tmp/evil" in command
+    assert "--config=/tmp/evil" not in command
 
 
 def test_gogcli_denies_send_even_if_called_directly():

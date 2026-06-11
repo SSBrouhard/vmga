@@ -470,7 +470,13 @@ def test_http_broker_rejects_oversized_request_body():
                         "\r\n"
                     ).encode("ascii")
                 )
-                response = client.recv(4096).decode("utf-8")
+                chunks = []
+                while True:
+                    chunk = client.recv(4096)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                response = b"".join(chunks).decode("utf-8")
             body = response.split("\r\n\r\n", 1)[1]
             payload = json.loads(body)
         finally:
@@ -522,6 +528,39 @@ def test_http_broker_returns_generic_error_for_deep_failures():
         "error_code": "vmga_broker_request_failed",
         "error": "VMGA broker request failed",
     }
+
+
+def test_http_broker_rejects_duplicate_and_case_colliding_json_keys():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        adapter = make_adapter(SQLiteStateStore(str(Path(tmpdir) / "vmga.sqlite3")))
+        server = make_server("127.0.0.1", 0, VMGABroker(adapter))
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            host, port = server.server_address
+            for body in [
+                b'{"action":"read","actor_id":"agent_1","actor_id":"agent_2"}',
+                b'{"action":"create_draft","actor_id":"agent_1","parameters":{"cc":"a@example.com","Cc":"b@example.com"}}',
+            ]:
+                req = request.Request(
+                    f"http://{host}:{port}/v1/proposals",
+                    data=body,
+                    method="POST",
+                    headers={"Content-Type": "application/json"},
+                )
+                with pytest.raises(error.HTTPError) as excinfo:
+                    request.urlopen(req, timeout=5)
+                payload = json.loads(excinfo.value.read().decode("utf-8"))
+                assert excinfo.value.code == 400
+                assert payload == {
+                    "status": "DENY",
+                    "error_code": "vmga_broker_bad_request",
+                    "error": "Invalid VMGA broker request",
+                }
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
 
 
 def test_broker_executes_allowed_search_through_backend():
@@ -632,6 +671,87 @@ def test_broker_rejects_crlf_in_single_line_fields():
     assert label["status"] == "DENY"
     assert label["error_code"] == "vmga_broker_bad_request"
     assert "control characters" in label["error"]
+
+
+def test_broker_rejects_hidden_unicode_in_review_bound_content():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        adapter = make_adapter(SQLiteStateStore(str(Path(tmpdir) / "vmga.sqlite3")))
+        broker = VMGABroker(adapter)
+
+        result = broker.propose(
+            {
+                "action": "create_draft",
+                "actor_id": "agent_1",
+                "recipients": ["ops@example.com"],
+                "content": "visible text\u200bhidden text",
+                "subject": "Safe subject",
+            }
+        )
+
+    assert result["status"] == "DENY"
+    assert result["error_code"] == "vmga_broker_bad_request"
+    assert "hidden/control" in result["error"]
+
+
+def test_broker_rejects_scalar_type_confusion():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        adapter = make_adapter(SQLiteStateStore(str(Path(tmpdir) / "vmga.sqlite3")))
+        broker = VMGABroker(adapter)
+
+        actor_list = broker.propose(
+            {
+                "action": "read",
+                "actor_id": ["agent_1"],
+                "search_query": "in:inbox",
+            }
+        )
+        nested_parameter = broker.propose(
+            {
+                "action": "apply_label",
+                "actor_id": "agent_1",
+                "message_ids": ["m1"],
+                "parameters": {"label": ["safe", ["nested"]]},
+            }
+        )
+
+    assert actor_list["status"] == "DENY"
+    assert actor_list["error_code"] == "vmga_broker_bad_request"
+    assert "actor_id must be a scalar" in actor_list["error"]
+    assert nested_parameter["status"] == "DENY"
+    assert nested_parameter["error_code"] == "vmga_broker_bad_request"
+    assert "parameters.label must be a scalar" in nested_parameter["error"]
+
+
+def test_broker_rejects_idn_and_punycode_recipient_display_attacks():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        adapter = make_adapter(SQLiteStateStore(str(Path(tmpdir) / "vmga.sqlite3")))
+        broker = VMGABroker(adapter)
+
+        unicode_domain = broker.propose(
+            {
+                "action": "create_draft",
+                "actor_id": "agent_1",
+                "recipients": ["payee@раypal.com"],
+                "content": "Draft",
+                "subject": "Safe subject",
+            }
+        )
+        punycode_domain = broker.propose(
+            {
+                "action": "create_draft",
+                "actor_id": "agent_1",
+                "recipients": ["payee@xn--paypl-3ve.com"],
+                "content": "Draft",
+                "subject": "Safe subject",
+            }
+        )
+
+    assert unicode_domain["status"] == "DENY"
+    assert unicode_domain["error_code"] == "vmga_broker_bad_request"
+    assert "non-IDN ASCII domain" in unicode_domain["error"]
+    assert punycode_domain["status"] == "DENY"
+    assert punycode_domain["error_code"] == "vmga_broker_bad_request"
+    assert "non-IDN ASCII domain" in punycode_domain["error"]
 
 
 def test_broker_rejects_action_parameter_smuggling():

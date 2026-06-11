@@ -20,6 +20,21 @@ GENERIC_REQUEST_ERROR = "VMGA broker request failed"
 GENERIC_BAD_REQUEST_ERROR = "Invalid VMGA broker request"
 
 
+def reject_duplicate_json_object(pairs: list[tuple[str, Any]]) -> Dict[str, Any]:
+    """Reject exact or case-colliding JSON keys before Python drops earlier values."""
+    seen_exact: set[str] = set()
+    seen_folded: set[str] = set()
+    result: Dict[str, Any] = {}
+    for key, value in pairs:
+        folded = key.casefold()
+        if key in seen_exact or folded in seen_folded:
+            raise ValueError("duplicate or case-colliding JSON object key")
+        seen_exact.add(key)
+        seen_folded.add(folded)
+        result[key] = value
+    return result
+
+
 class VMGABroker:
     def __init__(
         self,
@@ -151,7 +166,10 @@ class VMGAHTTPHandler(BaseHTTPRequestHandler):
             return {}
         if length > MAX_REQUEST_BODY_BYTES:
             raise ValueError("request body too large")
-        return json.loads(self.rfile.read(length).decode("utf-8"))
+        payload = json.loads(self.rfile.read(length).decode("utf-8"), object_pairs_hook=reject_duplicate_json_object)
+        if not isinstance(payload, dict):
+            raise ValueError("broker request body must be a JSON object")
+        return payload
 
     def _authorized(self) -> bool:
         if not self.bearer_token:
