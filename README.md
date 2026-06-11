@@ -91,6 +91,21 @@ python3 -m pip install -e ".[dev]"
 pytest -q
 ```
 
+Safe local playground, no Gmail account or OAuth credentials required:
+
+```bash
+python scripts/vmga_fixture_playground.py --force
+```
+
+The playground uses `examples/fixtures/safe_mailbox.json` with the fake Gmail
+backend and writes local artifacts under `artifacts/vmga-fixture-playground/`.
+It uses a fixture-only in-memory approval secret and no live keyring, OAuth
+token, broker token, gog config, or network service.
+Its terminal output includes deterministic `VMGA_PLAYGROUND` lines showing a
+direct execution bypass denial, repeated-denial `vmga_pressure_signal` evidence,
+proposal-mutation `vmga_pressure_signal` evidence, and a replay denial with
+`vmga_approval_already_used`.
+
 ## Broker Mode
 
 Run the local broker with the fake backend for offline development:

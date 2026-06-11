@@ -161,6 +161,17 @@ def test_release_check_flags_personal_gmail_addresses_in_public_docs(tmp_path: P
     assert any(item.code == "public_identity_gmail_address" for item in report.errors)
 
 
+def test_release_check_scans_example_json_fixtures(tmp_path: Path) -> None:
+    _populate_safe_repo(tmp_path)
+    _write(tmp_path / "examples" / "fixtures" / "unsafe.json", '{"mailbox":"person@gmail.com"}\n')
+    checker = _load_release_checker()
+
+    report = checker.run_release_check(tmp_path)
+
+    assert any(item.code == "public_identity_gmail_address" for item in report.errors)
+    assert any(item.path and item.path.endswith("unsafe.json") for item in report.errors)
+
+
 def test_release_check_reports_missing_required_file(tmp_path: Path) -> None:
     _populate_safe_repo(tmp_path)
     (tmp_path / "CONTRIBUTING.md").unlink()
