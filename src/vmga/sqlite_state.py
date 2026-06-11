@@ -88,6 +88,36 @@ class SQLiteStateStore:
             rows = conn.execute("SELECT proposal_id, payload FROM approvals").fetchall()
         return {row["proposal_id"]: ApprovalRecord.from_dict(json.loads(row["payload"])) for row in rows}
 
+    def consume_approval_for_execution(self, proposal_id: str, expected: ApprovalRecord) -> Tuple[bool, str, Optional[ApprovalRecord]]:
+        """Atomically mark an approval used if it still matches the validated record.
+
+        This is VMGA's SQLite at-most-once consume primitive. The caller first
+        validates the loaded approval; this method then takes a write
+        transaction, reloads the current row, confirms it is still unused and
+        byte-for-byte equivalent to the validated record except for `used`, and
+        persists `used=true` before execution begins.
+        """
+        expected_payload = expected.to_dict()
+        expected_payload["used"] = False
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT payload FROM approvals WHERE proposal_id = ?", (proposal_id,)).fetchone()
+            if row is None:
+                return False, "not_found", None
+            current = ApprovalRecord.from_dict(json.loads(row["payload"]))
+            if current.used:
+                return False, "already_used", current
+            current_payload = current.to_dict()
+            current_payload["used"] = False
+            if current_payload != expected_payload:
+                return False, "record_mismatch", current
+            current.used = True
+            conn.execute(
+                "UPDATE approvals SET payload = ? WHERE proposal_id = ?",
+                (json.dumps(current.to_dict(), sort_keys=True), proposal_id),
+            )
+            return True, "consumed", current
+
     def save_rate_limit_state(self, failed_attempts: Dict[str, Dict[str, Any]]) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM rate_limit_state")

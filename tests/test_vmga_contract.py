@@ -109,6 +109,70 @@ def test_sqlite_state_persists_approval_used_flag():
         assert replay["error_code"] == "vmga_approval_already_used"
 
 
+def test_sqlite_approval_consumption_is_atomic_across_independent_adapters():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = str(Path(tmpdir) / "vmga.sqlite3")
+        approver = make_adapter(SQLiteStateStore(db_path))
+        result = approver.propose_action("create_draft", "agent_1", content="Draft", justification="Test")
+        token = approver.compute_approval_token(result["proposal_id"], result["proposal_hash"], "operator_1")
+        assert approver.approve_proposal(result["proposal_id"], "operator_1", token)["status"] == "APPROVED"
+
+        adapter_a = make_adapter(SQLiteStateStore(db_path))
+        adapter_b = make_adapter(SQLiteStateStore(db_path))
+        release = threading.Event()
+        entered = threading.Event()
+        execution_count = 0
+        execution_lock = threading.Lock()
+
+        def handler(_request):
+            nonlocal execution_count
+            with execution_lock:
+                execution_count += 1
+            entered.set()
+            release.wait(timeout=5)
+            return {"ok": True}
+
+        outcomes = []
+
+        def run(adapter):
+            outcomes.append(adapter.execute_approved(result["proposal_id"], result["proposal_hash"], token, handler))
+
+        first = threading.Thread(target=run, args=(adapter_a,))
+        second = threading.Thread(target=run, args=(adapter_b,))
+        first.start()
+        assert entered.wait(timeout=5)
+        second.start()
+        release.set()
+        first.join(timeout=5)
+        second.join(timeout=5)
+
+        statuses = sorted(outcome["status"] for outcome in outcomes)
+        assert statuses == ["DENY", "SUCCESS"]
+        assert execution_count == 1
+        assert any(outcome.get("error_code") == "vmga_approval_already_used" for outcome in outcomes)
+
+
+def test_sqlite_approval_consumed_before_execution_failure_denies_replay_after_restart():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = str(Path(tmpdir) / "vmga.sqlite3")
+        adapter = make_adapter(SQLiteStateStore(db_path))
+        result = adapter.propose_action("create_draft", "agent_1", content="Draft", justification="Test")
+        token = adapter.compute_approval_token(result["proposal_id"], result["proposal_hash"], "operator_1")
+        assert adapter.approve_proposal(result["proposal_id"], "operator_1", token)["status"] == "APPROVED"
+
+        def failing_handler(_request):
+            raise RuntimeError("backend unavailable after consume")
+
+        failed = adapter.execute_approved(result["proposal_id"], result["proposal_hash"], token, failing_handler)
+        assert failed["status"] == "ERROR"
+        assert failed["error_code"] == "vmga_execution_failed"
+
+        restarted = make_adapter(SQLiteStateStore(db_path))
+        replay = restarted.execute_approved(result["proposal_id"], result["proposal_hash"], token, lambda request: {"ok": True})
+        assert replay["status"] == "DENY"
+        assert replay["error_code"] == "vmga_approval_already_used"
+
+
 def test_sqlite_state_uses_wal_and_busy_timeout():
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = str(Path(tmpdir) / "vmga.sqlite3")

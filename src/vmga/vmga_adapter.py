@@ -1533,6 +1533,32 @@ class VMGAGmailAdapter:
         # Persist immediately to survive restart
         self.state_store.save_rate_limit_state(self._failed_token_attempts)
 
+    def _consume_approval_before_execute(self, proposal_id: str, approval: ApprovalRecord) -> Tuple[bool, str, str]:
+        """Consume approval before execution for at-most-once kinetic semantics."""
+        consume = getattr(self.state_store, "consume_approval_for_execution", None)
+        if consume is not None:
+            ok, reason, consumed = consume(proposal_id, approval)
+            if ok and consumed is not None:
+                self.approvals[proposal_id] = consumed
+                return True, "Approval consumed", "vmga_approval_consumed"
+            if reason == "already_used":
+                return False, "Approval already used", "vmga_approval_already_used"
+            if reason == "not_found":
+                return False, "Approval not found", "vmga_approval_not_found"
+            return False, "Approval state changed before execution", "vmga_approval_binding_mismatch"
+
+        approval.used = True
+        approval_correlation_id = None
+        metadata = approval.parameters.get("metadata")
+        if isinstance(metadata, dict) and metadata.get("correlation_id"):
+            approval_correlation_id = str(metadata["correlation_id"])
+        elif approval.parameters.get("correlation_id"):
+            approval_correlation_id = str(approval.parameters["correlation_id"])
+        if not self._save_state_with_fail_closed(True, proposal=None, operation="approval_used", correlation_id=approval_correlation_id):
+            approval.used = False
+            return False, "Failed to persist approval consumption", "vmga_state_persist_failed"
+        return True, "Approval consumed", "vmga_approval_consumed"
+
     def execute_approved(
         self, proposal_id: str, proposal_hash: str, approval_token: str, executor_fn: Callable,
     ) -> Dict[str, Any]:
@@ -1553,6 +1579,15 @@ class VMGAGmailAdapter:
         is_valid, reason, error_code = self._is_approval_valid(proposal_id, proposal_hash, approval.approver_id, approval_token)
         if not is_valid:
             return {"status": "DENY", "error": reason, "error_code": error_code, "rule_id": error_code}
+
+        consumed, consume_reason, consume_code = self._consume_approval_before_execute(proposal_id, approval)
+        if not consumed:
+            return {"status": "DENY", "error": consume_reason, "error_code": consume_code, "rule_id": consume_code}
+        approval = self.approvals[proposal_id]
+        try:
+            self.state_store.save_rate_limit_state(self._failed_token_attempts)
+        except Exception:
+            pass
 
         # Build Vesta envelope
         request = ExecutionRequestEnvelope(
@@ -1577,25 +1612,6 @@ class VMGAGmailAdapter:
         except Exception as e:
             error_info = str(e)
             execution_result = {"status": "ERROR", "error": error_info, "error_code": "vmga_execution_failed"}
-
-        # Mark used ONLY after successful execution with fail-closed persistence
-        if success:
-            approval.used = True
-            approval_correlation_id = None
-            metadata = approval.parameters.get("metadata")
-            if isinstance(metadata, dict) and metadata.get("correlation_id"):
-                approval_correlation_id = str(metadata["correlation_id"])
-            elif approval.parameters.get("correlation_id"):
-                approval_correlation_id = str(approval.parameters["correlation_id"])
-            if not self._save_state_with_fail_closed(True, proposal=None, operation="approval_used", correlation_id=approval_correlation_id):
-                # State save failed - approval may be replayable after restart
-                # Log and return error, but don't mark as used in memory
-                approval.used = False
-                return {
-                    "status": "ERROR",
-                    "error": "Execution succeeded but failed to persist used state (fail-closed)",
-                    "error_code": "vmga_state_persist_failed"
-                }
 
         # Log execution
         self._log_action_executed(proposal_id, proposal_hash, approval.approver_id, execution_result, error_info)
