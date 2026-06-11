@@ -8,7 +8,9 @@ contract.
 
 - `mail_search`: read-only search.
 - `mail_get`: read-only message retrieval.
-- `mail_get_attachment`: governed attachment retrieval.
+- `mail_get_attachment`: governed attachment-release request.
+- `mail_archive`: proposal-backed archive request.
+- `mail_apply_label`: proposal-backed label request.
 - `mail_create_draft`: proposal-backed draft creation.
 - `mail_send`: proposal-backed send request, denied or held unless policy and
   approval permit execution.
@@ -133,6 +135,9 @@ For a VMGA Hermes plugin:
   `plugin.yaml`, `__init__.py`, `schemas.py`, and `tools.py`.
 - Declare only VMGA-provided tools in `plugin.yaml` `provides_tools`, and keep
   the manifest as release evidence.
+- Keep handlers shell-free: agent-visible Hermes mail tools submit structured
+  JSON proposal payloads to the VMGA broker and must not dispatch bash,
+  terminal, browser, MCP, native Gmail, `gog`, or `gws` calls.
 - Use `requires_env` only for non-secret broker endpoints or intentionally
   injected VMGA broker credentials; do not use it to pass Gmail OAuth material
   into the agent plugin.

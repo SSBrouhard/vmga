@@ -14,8 +14,11 @@ hermes_tools:
   - mail_search
   - mail_get
   - mail_get_attachment
+  - mail_archive
+  - mail_apply_label
   - mail_create_draft
   - mail_send
 guardrails:
   allow_only_vmga_mail_tools: true
   deny_direct_native_gmail_paths: true
+  structured_payloads_only: true

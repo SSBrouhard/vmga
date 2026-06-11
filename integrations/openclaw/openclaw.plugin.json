@@ -29,9 +29,19 @@
     "tools": [
       "mail_search",
       "mail_get",
+      "mail_summarize",
+      "mail_classify",
+      "mail_extract_entities",
+      "mail_recommend_draft",
       "mail_get_attachment",
       "mail_create_draft",
-      "mail_send"
+      "mail_send",
+      "mail_forward",
+      "mail_archive",
+      "mail_delete",
+      "mail_apply_label",
+      "mail_mark_read",
+      "mail_move"
     ]
   }
 }

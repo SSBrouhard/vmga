@@ -14,6 +14,32 @@ from integrations.hermes import tools as hermes_tools
 
 
 ROOT = Path(__file__).resolve().parents[1]
+HERMES_TOOLS = [
+    "mail_search",
+    "mail_get",
+    "mail_get_attachment",
+    "mail_archive",
+    "mail_apply_label",
+    "mail_create_draft",
+    "mail_send",
+]
+OPENCLAW_TOOL_ACTIONS = {
+    "mail_search": "read",
+    "mail_get": "read",
+    "mail_summarize": "summarize",
+    "mail_classify": "classify",
+    "mail_extract_entities": "extract_entities",
+    "mail_recommend_draft": "recommend_draft",
+    "mail_get_attachment": "download_attachment",
+    "mail_create_draft": "create_draft",
+    "mail_send": "send",
+    "mail_forward": "forward",
+    "mail_archive": "archive",
+    "mail_delete": "delete",
+    "mail_apply_label": "apply_label",
+    "mail_mark_read": "mark_read",
+    "mail_move": "move",
+}
 
 
 class _FakeBrokerResponse:
@@ -36,18 +62,24 @@ def _read_yaml(path: Path) -> Dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
+def _read_action_catalog_actions() -> set[str]:
+    text = (ROOT / "docs" / "action_catalog.md").read_text(encoding="utf-8")
+    match = re.search(
+        r"<!-- BEGIN VMGA_ACTION_CATALOG -->\s*```json\s*(.*?)\s*```\s*<!-- END VMGA_ACTION_CATALOG -->",
+        text,
+        re.S,
+    )
+    assert match
+    catalog = json.loads(match.group(1))
+    return {entry["action"] for entry in catalog["actions"]}
+
+
 def test_hermes_manifest_declares_expected_tools_only():
     manifest = yaml.safe_load((ROOT / "integrations" / "hermes" / "plugin.yaml").read_text(encoding="utf-8"))
 
     assert manifest["name"] == "vmga-mail"
     assert manifest["requires_env"][0]["name"] == "VMGA_BROKER_URL"
-    assert manifest["provides_tools"] == [
-        "mail_search",
-        "mail_get",
-        "mail_get_attachment",
-        "mail_create_draft",
-        "mail_send",
-    ]
+    assert manifest["provides_tools"] == HERMES_TOOLS
 
 
 def test_hermes_schemas_define_v5_tools():
@@ -55,16 +87,12 @@ def test_hermes_schemas_define_v5_tools():
         schemas.MAIL_SEARCH["name"],
         schemas.MAIL_GET["name"],
         schemas.MAIL_GET_ATTACHMENT["name"],
+        schemas.MAIL_ARCHIVE["name"],
+        schemas.MAIL_APPLY_LABEL["name"],
         schemas.MAIL_CREATE_DRAFT["name"],
         schemas.MAIL_SEND["name"],
     }
-    assert names == {
-        "mail_search",
-        "mail_get",
-        "mail_get_attachment",
-        "mail_create_draft",
-        "mail_send",
-    }
+    assert names == set(HERMES_TOOLS)
 
 
 def test_hermes_handler_returns_json_and_posts_to_broker():
@@ -95,6 +123,27 @@ def test_hermes_handler_returns_json_and_posts_to_broker():
     assert captured["auth"] == "Bearer broker-token"
     assert captured["payload"]["action"] == "read"
     assert captured["payload"]["search_query"] == "from:test@example.com"
+
+
+def test_hermes_label_handler_posts_structured_broker_payload():
+    captured: Dict[str, Any] = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["payload"] = json.loads(req.data.decode("utf-8")) if req.data else {}
+        return _FakeBrokerResponse(b'{"status":"REVIEW_REQUIRED"}')
+
+    with patch("integrations.hermes.tools.request.urlopen", fake_urlopen):
+        output = json.loads(
+            hermes_tools.mail_apply_label(
+                {"message_id": "m1", "label": "Needs Review"},
+                broker_url="https://vmga.example.invalid",
+            )
+        )
+
+    assert output["status"] == "OK"
+    assert captured["payload"]["action"] == "apply_label"
+    assert captured["payload"]["message_ids"] == ["m1"]
+    assert captured["payload"]["parameters"] == {"label": "Needs Review"}
 
 
 def test_hermes_handler_fails_closed_when_broker_is_missing():
@@ -135,13 +184,7 @@ def test_openclaw_manifest_and_route_contract():
     assert manifest["id"] == "plugin.vmga"
     assert "broker_token" in manifest["configSchema"]["properties"]
     assert "broker_timeout_seconds" in manifest["configSchema"]["properties"]
-    assert manifest["contracts"]["tools"] == [
-        "mail_search",
-        "mail_get",
-        "mail_get_attachment",
-        "mail_create_draft",
-        "mail_send",
-    ]
+    assert manifest["contracts"]["tools"] == list(OPENCLAW_TOOL_ACTIONS)
 
 
 def test_openclaw_adapter_maps_tools_and_blocks_disallowed_paths():
@@ -149,10 +192,20 @@ def test_openclaw_adapter_maps_tools_and_blocks_disallowed_paths():
 
     assert adapter.map_tool("mail_search") == "read"
     assert adapter.map_tool("mail_get_attachment") == "download_attachment"
+    assert adapter.map_tool("mail_apply_label") == "apply_label"
 
     result = adapter.execute(OpenClawRequest(tool_id="gmail.send", payload={}))
     assert result["status"] == "DENY"
     assert result["error_code"] == "vmga_tool_denied"
+
+
+def test_openclaw_tool_map_is_aligned_to_action_catalog():
+    catalog_actions = _read_action_catalog_actions()
+    adapter = VMGAOpenClawProfileAdapter("https://vmga.example.invalid")
+
+    assert set(OPENCLAW_TOOL_ACTIONS.values()) == catalog_actions
+    for tool_id, action in OPENCLAW_TOOL_ACTIONS.items():
+        assert adapter.map_tool(tool_id) == action
 
 
 def test_openclaw_adapter_posts_to_broker_with_expected_payload_shape():
@@ -189,6 +242,33 @@ def test_openclaw_adapter_posts_to_broker_with_expected_payload_shape():
     assert captured["auth"] == "Bearer broker-token"
     assert captured["payload"]["action"] == "send"
     assert captured["payload"]["actor_id"] == "openclaw-operator"
+
+
+def test_openclaw_adapter_preserves_pressure_signal_denials():
+    response = {
+        "status": "DENY",
+        "error_code": "vmga_lockdown_active",
+        "evidence_events": [
+            {
+                "event_type": "vmga_pressure_signal",
+                "signal_type": "repeated_denial_escalation",
+                "actor_id": "openclaw-operator",
+            }
+        ],
+    }
+
+    with patch(
+        "integrations.openclaw.profile_adapter.urllib_request.urlopen",
+        lambda _req, timeout=None: _FakeBrokerResponse(json.dumps(response)),
+    ):
+        output = VMGAOpenClawProfileAdapter("https://vmga.example.invalid").execute(
+            OpenClawRequest(tool_id="mail_send", payload={"recipients": ["a@example.com"], "content": "send now"})
+        )
+
+    assert output["status"] == "DENY"
+    assert output["broker_response"]["error_code"] == "vmga_lockdown_active"
+    assert output["pressure_signals"][0]["event_type"] == "vmga_pressure_signal"
+    assert output["pressure_signals"][0]["signal_type"] == "repeated_denial_escalation"
 
 
 def test_openclaw_example_does_not_allow_gmail_workspace_direct_paths():

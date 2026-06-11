@@ -124,6 +124,7 @@ def _build_payload(action: str, args: Any, kwargs: Dict[str, Any]) -> Dict[str, 
         "content": args.get("content"),
         "recipients": _as_list(args.get("recipients")),
         "attachment_ids": _as_list(args.get("attachment_ids")),
+        "parameters": args.get("parameters") if isinstance(args.get("parameters"), dict) else {},
         "justification": args.get("justification", ""),
         "requested_at": _now_iso(),
         "metadata": {
@@ -162,6 +163,26 @@ def _handler(tool_name: str, args: Any, kwargs: Dict[str, Any], *, action: str) 
         extra_payload["message_id"] = str(args.get("message_id"))
         extra_payload["attachment_ids"] = [str(args.get("attachment_id"))]
 
+    elif tool_name == "mail_archive":
+        message_ids = _as_list(args.get("message_ids"))
+        if not message_ids and args.get("message_id"):
+            message_ids = [str(args["message_id"])]
+        if not message_ids:
+            return _denial_json(tool_name, "vmga_invalid_payload", "message_id or message_ids is required")
+        extra_payload["message_ids"] = message_ids
+
+    elif tool_name == "mail_apply_label":
+        message_ids = _as_list(args.get("message_ids"))
+        if not message_ids and args.get("message_id"):
+            message_ids = [str(args["message_id"])]
+        if not message_ids:
+            return _denial_json(tool_name, "vmga_invalid_payload", "message_id or message_ids is required")
+        label = str(args.get("label", "")).strip()
+        if not label:
+            return _denial_json(tool_name, "vmga_invalid_payload", "label is required")
+        extra_payload["message_ids"] = message_ids
+        extra_payload["parameters"] = {**extra_payload["parameters"], "label": label}
+
     if action in {"create_draft", "send"}:
         recipients = _as_list(args.get("recipients"))
         if not recipients:
@@ -185,6 +206,14 @@ def mail_get_attachment(args: Any, **kwargs) -> str:
     return _handler("mail_get_attachment", args, kwargs, action="download_attachment")
 
 
+def mail_archive(args: Any, **kwargs) -> str:
+    return _handler("mail_archive", args, kwargs, action="archive")
+
+
+def mail_apply_label(args: Any, **kwargs) -> str:
+    return _handler("mail_apply_label", args, kwargs, action="apply_label")
+
+
 def mail_create_draft(args: Any, **kwargs) -> str:
     return _handler("mail_create_draft", args, kwargs, action="create_draft")
 
@@ -197,6 +226,8 @@ __all__ = [
     "mail_search",
     "mail_get",
     "mail_get_attachment",
+    "mail_archive",
+    "mail_apply_label",
     "mail_create_draft",
     "mail_send",
 ]
