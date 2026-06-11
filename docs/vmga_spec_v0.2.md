@@ -9,6 +9,13 @@ Revised: 2026-04-14
 > `docs/deployment_runbook.md`. The standalone ledger is append-only JSONL, not
 > hash-chained, and credential isolation is a deployment precondition rather
 > than something the package can enforce by itself.
+>
+> v0.3.0 extends this v0.2 boundary with implemented asymmetric Ed25519
+> approval signatures and a keyed, hash-chained evidence ledger. See
+> `docs/approval_signing_design.md` for out-of-domain approval signing and
+> `docs/evidence_integrity_design.md` for Tier-1 evidence integrity. Do not stop
+> at the v0.2 append-only JSONL / HMAC approval boundaries when reviewing the
+> current codebase.
 
 ---
 

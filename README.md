@@ -69,6 +69,11 @@ auth, operator allowlists, sandboxing, and direct-bypass evidence.
 - Draft creation, sending, forwarding, archive/delete/label operations.
 - Attachment download and release.
 - Proposal hashing, approval binding, execution integrity, and lockdown.
+- Action-tier cataloging with release-check drift protection in
+  `docs/action_catalog.md`.
+- Multi-turn pressure evidence through `vmga_pressure_signal` events for
+  repeated denials, urgency or authority-language pressure, and proposal
+  mutation attempts.
 
 ## Repository Layout
 
@@ -196,8 +201,8 @@ so the operator can search for and bulk-delete generated drafts.
 - Hermes security, Docker, Tool Gateway, credential-pool, gateway-internals,
   session-storage, CLI-extension, and tools-runtime docs, as Hermes deployment
   boundary references.
-- Hermes plugin-build docs, as the reference shape for VMGA's future Hermes
-  plugin package and tool handler contract.
+- Hermes plugin-build docs, as the reference shape for VMGA's Hermes
+  integration package and tool handler contract.
 
 ## Non-Goals
 
