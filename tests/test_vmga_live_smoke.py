@@ -67,7 +67,17 @@ def test_live_smoke_search_and_send_denial_are_redacted(tmp_path: Path):
     assert len(calls) == 3
 
 
-def test_live_smoke_create_draft_requires_approval_secret(tmp_path: Path):
+def test_live_smoke_create_draft_requires_approval_secret(tmp_path: Path, capsys):
+    def fake_urlopen(req, timeout=None):
+        if req.get_method() == "GET":
+            return _FakeBrokerResponse({"status": "ok", "profile": "test"})
+        payload = json.loads(req.data.decode("utf-8"))
+        if payload["action"] == "read":
+            return _FakeBrokerResponse({"status": "ALLOW", "backend_result": {"status": "SUCCESS"}})
+        if payload["action"] == "send":
+            return _FakeBrokerResponse({"status": "DENY"})
+        raise AssertionError(payload)
+
     args = SimpleNamespace(
         broker_url="https://vmga.example.invalid",
         broker_token=None,
@@ -85,7 +95,10 @@ def test_live_smoke_create_draft_requires_approval_secret(tmp_path: Path):
         draft_subject="subject",
     )
 
-    with patch.dict(os.environ, {}, clear=False):
+    with patch.dict(os.environ, {}, clear=False), patch("vmga.live_smoke.request.urlopen", fake_urlopen):
         result = smoke.run_live_smoke(args)
 
     assert result == 2
+    captured = capsys.readouterr()
+    assert "approval HMAC secret is required" in captured.err
+    assert "MISSING_VMGA_SECRET" not in captured.err

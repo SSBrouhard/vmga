@@ -1,10 +1,10 @@
 # Approval Signing Design
 
-Status: draft for `v0.3.0` issue #24. This document defines the intended
-approval-signature boundary before implementation. It does not change the
-current VMGA approval behavior: until this design ships and approver private
-keys are held outside the broker and agent authority domains, VMGA approvals
-remain HMAC-based and broker-forgeable on the approval axis.
+Status: implemented design record for `v0.3.0` issue #24. This document defines
+the approval-signature boundary. Signature mode changes VMGA approval behavior
+only when configured with approver public keys and when approver private keys
+are held outside the broker and agent authority domains. HMAC approval remains
+available and broker-forgeable on the approval axis.
 
 ## Goal
 

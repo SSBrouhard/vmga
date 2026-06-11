@@ -59,12 +59,14 @@ evidence skeleton. The command records hashes and broker health by default. Add
 `--include-local-tools` only when the local Hermes/OpenClaw/gog command output is
 intended to become part of the operator evidence bundle.
 
-For the draft `v0.3.0` integrity plan, see
-`docs/evidence_integrity_design.md`. Until that design is implemented and
-anchor material is configured outside the agent authority domain, VMGA evidence
-remains append-only JSONL with advisory verification.
+For the implemented Tier-1 evidence-integrity mode, see
+`docs/evidence_integrity_design.md`. Evidence integrity is active only when the
+broker is configured with an evidence HMAC key, key id, and expected-head
+checkpoint held outside the agent authority domain. Without that anchor
+material, VMGA evidence remains append-only JSONL with advisory verification.
 
-For the draft asymmetric approval-signature plan, see
-`docs/approval_signing_design.md`. Until that design is implemented and approver
-private keys are held outside the broker and agent authority domains, VMGA
-approvals remain HMAC-based and broker-forgeable on the approval axis.
+For the implemented asymmetric approval-signature mode, see
+`docs/approval_signing_design.md`. Signature mode is a hard approval-enforcement
+candidate only when approver private keys are held outside the broker and agent
+authority domains. HMAC approval remains available for advisory and development
+use and is broker-forgeable on the approval axis.

@@ -121,7 +121,7 @@ def run_live_smoke(args: argparse.Namespace) -> int:
             return 2
         approval_secret = os.getenv(args.approval_secret_env)
         if not approval_secret:
-            print(f"{args.approval_secret_env} is required with --create-draft", file=sys.stderr)
+            print("approval HMAC secret is required with --create-draft", file=sys.stderr)
             return 2
 
         draft = _post_json(

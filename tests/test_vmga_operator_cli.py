@@ -208,6 +208,26 @@ def test_broker_main_refuses_non_loopback_without_bearer_token(monkeypatch, tmp_
     assert "Refusing non-loopback bind without VMGA_BROKER_TOKEN" in capsys.readouterr().err
 
 
+def test_broker_main_missing_approval_secret_does_not_log_env_name(monkeypatch, tmp_path, capsys):
+    monkeypatch.delenv("VMGA_APPROVAL_SECRET", raising=False)
+
+    result = broker_main(
+        [
+            "--policy",
+            "policies/draft_assist.yaml",
+            "--state-db",
+            str(tmp_path / "state.sqlite3"),
+            "--ledger",
+            str(tmp_path / "evidence.jsonl"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert result == 2
+    assert "approval HMAC secret is required" in captured.err
+    assert "VMGA_APPROVAL_SECRET" not in captured.err
+
+
 def test_broker_main_requires_explicit_loopback_unauthenticated_opt_in(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("VMGA_APPROVAL_SECRET", "secret")
     monkeypatch.delenv("VMGA_BROKER_TOKEN", raising=False)
