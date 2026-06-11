@@ -107,6 +107,34 @@ def test_gogcli_isolates_option_like_user_values():
     assert "--config=/tmp/evil" not in command
 
 
+def test_gogcli_revalidates_direct_backend_payloads():
+    backend = GogCLIBackend(binary="/opt/homebrew/bin/gog-agent-safe")
+
+    comma_recipient = backend.execute(
+        "create_draft",
+        {
+            "recipients": ["ops@example.com,attacker@example.com"],
+            "content": "Body",
+            "parameters": {"subject": "Safe subject"},
+        },
+    )
+    hidden_subject = backend.execute(
+        "create_draft",
+        {
+            "recipients": ["ops@example.com"],
+            "content": "Body",
+            "parameters": {"subject": "Safe\u200b subject"},
+        },
+    )
+
+    assert comma_recipient["status"] == "DENY"
+    assert comma_recipient["error_code"] == "vmga_gogcli_invalid_payload"
+    assert "bare email address" in comma_recipient["error"]
+    assert hidden_subject["status"] == "DENY"
+    assert hidden_subject["error_code"] == "vmga_gogcli_invalid_payload"
+    assert "control characters" in hidden_subject["error"]
+
+
 def test_gogcli_denies_send_even_if_called_directly():
     backend = GogCLIBackend(binary="/opt/homebrew/bin/gog-agent-safe")
 

@@ -614,6 +614,8 @@ def test_broker_returns_generic_backend_error_details():
     assert result["status"] == "ALLOW"
     assert result["backend_result"]["error_code"] == "vmga_backend_execution_failed"
     assert result["backend_result"]["error"] == "Backend execution failed"
+    assert "error_class" not in result["backend_result"]
+    assert "RuntimeError" not in json.dumps(result)
     assert "secret path" not in json.dumps(result)
 
 

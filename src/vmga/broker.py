@@ -113,7 +113,6 @@ class VMGABroker:
                 "status": "ERROR",
                 "error_code": "vmga_backend_execution_failed",
                 "error": "Backend execution failed",
-                "error_class": exc.__class__.__name__,
             }
         return None
 
