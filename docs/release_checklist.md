@@ -66,8 +66,9 @@ deploying VMGA with live mailbox credentials.
   explicit `--agent-root` values and retain any `--direct-bypass-evidence`
   reference used with `--attest-no-direct-bypass`.
 - Verify posture output does not claim hard-ready from configuration strings
-  alone. Until the v0.3.0 implementations land, `hmac_chain` evidence and
-  `signature` approvals are design-stage requirements, not active proof.
+  alone. `hmac_chain` evidence must verify intact against the expected-head
+  checkpoint, and `signature` approval mode must load an active Ed25519 public
+  keyring before either can count toward hard-ready posture.
 - For v0.3.0 or later tags, verify evidence-integrity and approval-signature
   acceptance gates in `docs/evidence_integrity_design.md` and
   `docs/approval_signing_design.md` before making hard-boundary claims.

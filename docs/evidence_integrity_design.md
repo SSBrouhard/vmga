@@ -1,10 +1,10 @@
 # Evidence Integrity Design
 
-Status: draft for `v0.3.0` issue #2. This document defines the intended
-tamper-evidence boundary before implementation. It does not upgrade the current
-VMGA evidence claim: until this design ships and anchor material is configured
-outside the agent authority domain, VMGA evidence remains append-only JSONL
-with advisory verification.
+Status: implemented design record for `v0.3.0` issue #2. This document defines
+the Tier-1 tamper-evidence boundary. The implementation upgrades VMGA evidence
+only when anchor material is configured outside the agent authority domain;
+without that material, VMGA evidence remains append-only JSONL with advisory
+verification.
 
 ## Goal
 

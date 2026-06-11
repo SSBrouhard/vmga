@@ -567,6 +567,21 @@ def test_approval_token_cli_matches_adapter(monkeypatch, capsys):
         assert capsys.readouterr().out.strip() == expected
 
 
+def test_approval_token_cli_missing_secret_does_not_log_env_name(monkeypatch, capsys):
+    monkeypatch.delenv("VMGA_APPROVAL_SECRET", raising=False)
+
+    exit_code = approval_token_main([
+        "proposal_1",
+        "sha256:" + "a" * 64,
+        "operator_1",
+    ])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "approval HMAC secret is required" in captured.err
+    assert "VMGA_APPROVAL_SECRET" not in captured.err
+
+
 def test_approval_time_window_uses_five_minute_buckets():
     now = datetime(2026, 6, 10, 4, 17, 30, tzinfo=timezone.utc)
 

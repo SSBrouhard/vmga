@@ -133,7 +133,7 @@ def approval_token_main(argv: list[str] | None = None) -> int:
 
     approval_secret = os.getenv(args.secret_env)
     if not approval_secret:
-        print(f"{args.secret_env} is required", file=sys.stderr)
+        print("approval HMAC secret is required; configure the selected secret environment variable", file=sys.stderr)
         return 2
 
     time_window = args.time_window or VMGAGmailAdapter.approval_time_window(datetime.now(timezone.utc))
@@ -393,7 +393,7 @@ def broker_main(argv: list[str] | None = None) -> int:
 
     approval_secret = os.getenv(args.approval_secret_env)
     if args.approval_auth == "hmac" and not approval_secret:
-        print(f"{args.approval_secret_env} is required", file=sys.stderr)
+        print("approval HMAC secret is required for HMAC approval mode", file=sys.stderr)
         return 2
     approval_public_keys = {}
     if args.approval_auth == "signature":
