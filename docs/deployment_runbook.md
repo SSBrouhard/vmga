@@ -89,8 +89,17 @@ cron, or plugin write paths outside VMGA. Include a durable reference with
 `--direct-bypass-evidence`; do not use a bare attestation as a substitute for
 reviewable deployment evidence.
 
-The posture self-check reports configured intent and observable placement, not
-proof that every configured enforcement path has executed. `signature` approval
+The posture self-check distinguishes declared modes from operative ones.
+`signature` approval mode passes only when an approver keyring with at least
+one active, parseable Ed25519 key is actually loaded; declared-but-unloaded
+signature mode reports `warn` as non-operative. A chain evidence-integrity mode
+passes only when the evidence HMAC key is configured, an expected-head
+checkpoint exists, and the existing chain verifier returns `verified_intact`
+over the current ledger; `verified_tampered` is `fail` (mode advisory) and
+`cannot_verify` is `unknown` with the verifier's reason surfaced — for example,
+`vmga-operator posture --local` without the evidence key honestly reports
+`unknown` rather than guessing. Operative posture is still not proof of
+deployment-boundary isolation: `signature` approval
 mode verifies Ed25519 detached approvals with broker-held public keys only; it
 supports hard approval-enforcement claims only when the approver private key is
 isolated from both broker and agent authority domains. Residuals: private-key

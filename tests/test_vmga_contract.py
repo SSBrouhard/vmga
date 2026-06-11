@@ -190,9 +190,33 @@ def test_posture_path_checks_are_unknown_without_explicit_agent_roots():
         assert posture["mode"] == "cannot_determine"
 
 
-def test_posture_hard_ready_requires_explicit_bypass_attestation_and_roots():
+def test_posture_hard_ready_requires_explicit_bypass_attestation_and_roots(monkeypatch):
+    from vmga.evidence import evidence_event
+    from vmga.evidence_integrity import EvidenceCheckpoint, add_integrity_metadata, canonical_json_line
+
     with tempfile.TemporaryDirectory() as tmpdir:
         adapter = make_adapter(SQLiteStateStore(str(Path(tmpdir) / "vmga.sqlite3")))
+
+        # Finding 3: declared modes alone no longer reach hard-ready; the
+        # signature keyring and evidence chain must be operative.
+        key_id = "operator-test"
+        key_secret = "contract-test-secret"
+        monkeypatch.setenv("VMGA_EVIDENCE_HMAC_KEY", key_secret)
+        monkeypatch.setenv("VMGA_EVIDENCE_HMAC_KEY_ID", key_id)
+        ledger_path = Path(tmpdir) / "evidence.jsonl"
+        record = add_integrity_metadata(
+            evidence_event("vmga_proposal_received", proposal_id="p1", policy_state="ALLOW"),
+            key_id=key_id, key=key_secret.encode(), sequence=1, prev_mac=None,
+        )
+        ledger_path.write_text(canonical_json_line(record), encoding="utf-8")
+        head_store = SQLiteStateStore(str(Path(tmpdir) / "state.sqlite3"))
+        head_store.save_evidence_head(EvidenceCheckpoint(
+            ledger_path=str(ledger_path),
+            genesis_sequence=1, genesis_mac=record["integrity"]["mac"],
+            last_sequence=1, last_mac=record["integrity"]["mac"],
+            key_id=key_id,
+        ))
+
         broker = VMGABroker(
             adapter,
             posture_config=PostureConfig(
@@ -200,11 +224,12 @@ def test_posture_hard_ready_requires_explicit_bypass_attestation_and_roots():
                 gog_binary="/opt/homebrew/bin/gog-agent-safe",
                 policy_path=str(Path(tmpdir) / "policy.yaml"),
                 state_db_path=str(Path(tmpdir) / "state.sqlite3"),
-                ledger_path=str(Path(tmpdir) / "evidence.jsonl"),
+                ledger_path=str(ledger_path),
                 bearer_token_set=True,
                 ledger_rotate_bytes=100,
                 approval_auth="signature",
-                evidence_integrity="signed_checkpoint",
+                signature_readiness={"state": "verified_intact", "reason": "active_ed25519_keyring_loaded"},
+                evidence_integrity="hmac_chain",
                 agent_roots=[str(Path.cwd())],
                 gog_home=str(Path(tmpdir) / "gog-home"),
                 direct_bypass_attested=True,
@@ -216,6 +241,10 @@ def test_posture_hard_ready_requires_explicit_bypass_attestation_and_roots():
         assert posture["mode"] == "hard_enforcement_ready"
         assert posture["hard_enforcement_ready"] is True
         assert any(check["id"] == "direct_gmail_bypass" and check["status"] == "pass" for check in posture["checks"])
+
+        # Declared-but-not-operative must NOT be hard-ready.
+        broker.posture_config.signature_readiness = None
+        assert broker.posture()["hard_enforcement_ready"] is False
 
 
 def test_http_broker_exposes_posture_endpoint():

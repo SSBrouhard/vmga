@@ -921,16 +921,40 @@ class VMGAGmailAdapter:
         elif self.approval_auth == "hmac" and approval_secret is None:
             approval_secret = secrets.token_hex(32)  # Dev mode only
         self.approval_secret = approval_secret.encode() if approval_secret else None
-        self.signature_readiness = (
-            {"state": "cannot_verify", "reason": "missing_approval_public_keys"}
-            if self.approval_auth == "signature" and not self.approval_public_keys
-            else {"state": "verified_intact", "reason": "configured"}
-        )
+        if self.approval_auth == "signature":
+            self.signature_readiness = self._compute_signature_readiness()
+        else:
+            self.signature_readiness = {"state": "verified_intact", "reason": "configured"}
 
         self.evidence_hmac = EvidenceHMACConfig.from_env()
         if self.evidence_hmac is not None:
             self._recover_evidence_head_if_one_ahead()
 
+
+    def _compute_signature_readiness(self) -> Dict[str, str]:
+        """Report whether signature approval mode is operative, not merely declared.
+
+        Operative means a keyring is loaded, every declared key parses as
+        Ed25519, and at least one key is active. Anything less is
+        cannot_verify and must never render as ready.
+        """
+        if not self.approval_public_keys:
+            return {"state": "cannot_verify", "reason": "missing_approval_public_keys"}
+        active_keys = 0
+        for entries in self.approval_public_keys.values():
+            for entry in entries:
+                key_id = str(entry.get("key_id", "<missing key_id>"))
+                if entry.get("algorithm") != "ed25519":
+                    return {"state": "cannot_verify", "reason": f"unsupported_algorithm:{key_id}"}
+                try:
+                    self._load_ed25519_public_key(entry["public_key"])
+                except (KeyError, ValueError, TypeError):
+                    return {"state": "cannot_verify", "reason": f"unparseable_public_key:{key_id}"}
+                if entry.get("status", "active") == "active":
+                    active_keys += 1
+        if active_keys == 0:
+            return {"state": "cannot_verify", "reason": "no_active_keys"}
+        return {"state": "verified_intact", "reason": "active_ed25519_keyring_loaded"}
 
     def _save_state(self) -> None:
         """Save all state including lockdown and TTL-filtered proposals."""
