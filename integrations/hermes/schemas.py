@@ -56,7 +56,7 @@ MAIL_GET = {
 
 MAIL_GET_ATTACHMENT = {
     "name": "mail_get_attachment",
-    "description": "Fetch attachment metadata/route via VMGA",
+    "description": "Request attachment release through VMGA",
     "inputSchema": {
         "type": "object",
         "properties": {
@@ -78,6 +78,75 @@ MAIL_GET_ATTACHMENT = {
             },
         },
         "required": ["message_id", "attachment_id"],
+        "additionalProperties": False,
+    },
+}
+
+MAIL_ARCHIVE = {
+    "name": "mail_archive",
+    "description": "Submit an archive proposal through VMGA governance",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "message_id": {
+                "type": "string",
+                "description": "Single message identifier to archive",
+            },
+            "message_ids": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Message identifiers to archive",
+            },
+            "justification": {
+                "type": "string",
+                "description": "Optional review justification",
+            },
+            "actor_id": {
+                "type": "string",
+                "description": "Calling actor id",
+            },
+            "session_id": {
+                "type": "string",
+                "description": "Hermes session identifier",
+            },
+        },
+        "additionalProperties": False,
+    },
+}
+
+MAIL_APPLY_LABEL = {
+    "name": "mail_apply_label",
+    "description": "Submit a label-application proposal through VMGA governance",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "message_id": {
+                "type": "string",
+                "description": "Single message identifier to label",
+            },
+            "message_ids": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Message identifiers to label",
+            },
+            "label": {
+                "type": "string",
+                "description": "Allowed label to apply",
+            },
+            "justification": {
+                "type": "string",
+                "description": "Optional review justification",
+            },
+            "actor_id": {
+                "type": "string",
+                "description": "Calling actor id",
+            },
+            "session_id": {
+                "type": "string",
+                "description": "Hermes session identifier",
+            },
+        },
+        "required": ["label"],
         "additionalProperties": False,
     },
 }

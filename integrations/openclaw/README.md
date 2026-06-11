@@ -4,6 +4,10 @@ This OpenClaw tool plugin routes mailbox tool calls to the local VMGA broker.
 It does not call Gmail, gog, Google Workspace, shell, browser, or terminal
 tools directly.
 
+The plugin's VMGA action mapping is aligned with `docs/action_catalog.md`,
+including non-kinetic read/transform actions and kinetic draft, send, forward,
+archive, delete, label, attachment, mark-read, and move actions.
+
 Default broker URL: `http://127.0.0.1:8765`
 
 Install locally during development:

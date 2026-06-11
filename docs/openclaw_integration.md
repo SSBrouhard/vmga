@@ -12,7 +12,8 @@ the runtime boundary.
 The OpenClaw path must:
 
 - Register VMGA as a plugin with explicit enablement.
-- Map Gmail actions into structured VMGA proposals.
+- Map Gmail actions into structured VMGA proposals aligned with
+  `docs/action_catalog.md`.
 - Preserve `plugin_id`, `tool_id`, `actor_id`, and proposal metadata in evidence.
 - Keep Gmail credentials and approval verifier secrets outside the agent process.
 - Document that OpenClaw core internals are outside VMGA's enforcement claim.
@@ -164,6 +165,10 @@ operator-access surface for the gateway:
 - If Gmail, Workspace, shell, filesystem, browser, or plugin-owned write tools
   are reachable through `/tools/invoke`, they are VMGA bypass candidates unless
   they emit VMGA proposals and pass through VMGA execution.
+- Broker `DENY` or `LOCKDOWN` responses, including repeated-denial
+  `vmga_pressure_signal` evidence, are expected governance outcomes. The
+  OpenClaw adapter should surface the structured broker response to the runtime
+  without retrying, shelling out, or treating the denial as a plugin crash.
 
 OpenClaw returns 404 when policy denies a tool through this endpoint. VMGA
 deployment evidence should include at least one denied direct invocation for a

@@ -26,12 +26,32 @@ tools:
       vmga_action: read
     mail_get:
       vmga_action: read
+    mail_summarize:
+      vmga_action: summarize
+    mail_classify:
+      vmga_action: classify
+    mail_extract_entities:
+      vmga_action: extract_entities
+    mail_recommend_draft:
+      vmga_action: recommend_draft
     mail_get_attachment:
       vmga_action: download_attachment
     mail_create_draft:
       vmga_action: create_draft
     mail_send:
       vmga_action: send
+    mail_forward:
+      vmga_action: forward
+    mail_archive:
+      vmga_action: archive
+    mail_delete:
+      vmga_action: delete
+    mail_apply_label:
+      vmga_action: apply_label
+    mail_mark_read:
+      vmga_action: mark_read
+    mail_move:
+      vmga_action: move
 
 security:
   deny_tool_prefixes:

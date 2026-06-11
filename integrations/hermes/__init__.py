@@ -26,6 +26,18 @@ def register(ctx):
         handler=tools.mail_get_attachment,
     )
     ctx.register_tool(
+        name="mail_archive",
+        toolset="vmga_mail",
+        schema=schemas.MAIL_ARCHIVE,
+        handler=tools.mail_archive,
+    )
+    ctx.register_tool(
+        name="mail_apply_label",
+        toolset="vmga_mail",
+        schema=schemas.MAIL_APPLY_LABEL,
+        handler=tools.mail_apply_label,
+    )
+    ctx.register_tool(
         name="mail_create_draft",
         toolset="vmga_mail",
         schema=schemas.MAIL_CREATE_DRAFT,

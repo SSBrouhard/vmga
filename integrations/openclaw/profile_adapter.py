@@ -21,13 +21,19 @@ BROKER_ENDPOINT = "/v1/proposals"
 OPENCLAW_TOOL_MAP: Dict[str, str] = {
     "mail_search": "read",
     "mail_get": "read",
+    "mail_summarize": "summarize",
+    "mail_classify": "classify",
+    "mail_extract_entities": "extract_entities",
+    "mail_recommend_draft": "recommend_draft",
     "mail_get_attachment": "download_attachment",
     "mail_create_draft": "create_draft",
     "mail_send": "send",
     "mail_forward": "forward",
     "mail_archive": "archive",
     "mail_delete": "delete",
-    "mail_label": "apply_label",
+    "mail_apply_label": "apply_label",
+    "mail_mark_read": "mark_read",
+    "mail_move": "move",
 }
 
 
@@ -73,6 +79,44 @@ def _coerce_message_ids(payload: Mapping[str, Any]) -> List[str]:
     return []
 
 
+def _coerce_parameters(value: Any) -> Dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    return {}
+
+
+def _extract_pressure_signals(value: Any) -> List[Dict[str, Any]]:
+    if isinstance(value, dict):
+        if value.get("event_type") == "vmga_pressure_signal":
+            return [dict(value)]
+
+        signals: List[Dict[str, Any]] = []
+        for key in ("pressure_signals", "evidence", "evidence_events", "events"):
+            child = value.get(key)
+            if isinstance(child, list):
+                for item in child:
+                    signals.extend(_extract_pressure_signals(item))
+            elif isinstance(child, dict):
+                signals.extend(_extract_pressure_signals(child))
+        return signals
+
+    if isinstance(value, list):
+        signals = []
+        for item in value:
+            signals.extend(_extract_pressure_signals(item))
+        return signals
+
+    return []
+
+
+def _adapter_success_status(broker_response: Any) -> str:
+    if isinstance(broker_response, dict):
+        broker_status = str(broker_response.get("status", "")).upper()
+        if broker_status in {"DENY", "LOCKDOWN"}:
+            return "DENY"
+    return "OK"
+
+
 class VMGAOpenClawProfileAdapter:
     """Minimal mapping adapter for OpenClaw tool requests into VMGA proposal calls."""
 
@@ -114,12 +158,18 @@ class VMGAOpenClawProfileAdapter:
             "subject": request.payload.get("subject"),
             "recipients": _coerce_recipients(request.payload),
             "attachment_ids": request.payload.get("attachment_ids", []),
+            "parameters": _coerce_parameters(request.payload.get("parameters")),
             "requested_at": datetime.now(timezone.utc).isoformat(),
             "metadata": {
                 "source": "openclaw",
                 "tool_id": request.tool_id,
             },
         }
+
+        if request.tool_id == "mail_apply_label" and request.payload.get("label"):
+            payload["parameters"] = {**payload["parameters"], "label": str(request.payload["label"])}
+        if request.tool_id == "mail_move" and request.payload.get("destination"):
+            payload["parameters"] = {**payload["parameters"], "destination": str(request.payload["destination"])}
 
         # Ensure deterministic JSON shapes for audit/evidence correlation.
         payload["message_ids"] = [str(value) for value in payload["message_ids"]]
@@ -151,9 +201,10 @@ class VMGAOpenClawProfileAdapter:
             with urllib_request.urlopen(req, timeout=self.timeout_seconds) as response:
                 response_json = json.loads(response.read().decode("utf-8"))
             return {
-                "status": "OK",
+                "status": _adapter_success_status(response_json),
                 "tool": request_obj.tool_id,
                 "broker_response": response_json,
+                "pressure_signals": _extract_pressure_signals(response_json),
             }
         except error.URLError as exc:
             return {
