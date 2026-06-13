@@ -93,6 +93,16 @@ def mutate_sqlite_approval(db_path: str, proposal_id: str, mutate):
         )
 
 
+def test_sqlite_state_connect_context_closes_connection():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = SQLiteStateStore(str(Path(tmpdir) / "vmga.sqlite3"))
+        with store._connect() as conn:
+            conn.execute("SELECT 1").fetchone()
+
+        with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+            conn.execute("SELECT 1").fetchone()
+
+
 def test_versioned_proposal_contract_round_trip():
     proposal = VMGAProposal(
         proposal_id="prop_1",
